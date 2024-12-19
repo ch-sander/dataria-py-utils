@@ -90,9 +90,12 @@ def explore(endpoint_url,
             else:
                 row[var] = None
 
-        if geom_val is not None:
+        if geom_val is not None and isinstance(geom_val, (shapely.geometry.base.BaseGeometry)):
             row['geometry'] = geom_val
             rows.append(row)
+
+    if not rows or all('geometry' not in row or row['geometry'] is None for row in rows):
+        raise ValueError("No valid geometries in the data. Check the variable 'geo_var'.")
 
     # Create GeoDataFrame
     gdf = gpd.GeoDataFrame(rows, crs="EPSG:4326")
