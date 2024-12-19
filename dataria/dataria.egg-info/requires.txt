@@ -1,3 +1,0 @@
-SPARQLWrapper
-geopandas
-shapely
