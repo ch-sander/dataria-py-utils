@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: dataria
+Version: 0.1.0
+Summary: DATAria utils
+Author: Christoph Sander
+Requires-Python: >=3.6

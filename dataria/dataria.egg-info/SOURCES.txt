@@ -1,0 +1,8 @@
+setup.py
+GEO/__init__.py
+GEO/explore.py
+dataria.egg-info/PKG-INFO
+dataria.egg-info/SOURCES.txt
+dataria.egg-info/dependency_links.txt
+dataria.egg-info/requires.txt
+dataria.egg-info/top_level.txt
