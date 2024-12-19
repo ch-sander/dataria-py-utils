@@ -4,7 +4,7 @@ import geopandas as gpd
 import shapely.wkt
 from shapely.geometry import shape
 
-def sparql_to_folium_map(endpoint_url,
+def explore(endpoint_url,
                          query,
                          geo_var='geom',
                          label_var='label',
