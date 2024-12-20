@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from .DATA import sparql_to_dataframe
 
-def calculate_correlation(df=None,
+def correlation(df=None,
     endpoint_url=None,
     query=None,
     col1=None, col2=None, sep=',', edges=0, save_CSV=True, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True):
