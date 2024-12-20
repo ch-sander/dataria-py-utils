@@ -121,7 +121,7 @@ def correlation(df=None,
 
     return correlation_df
 
-def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation Heatmap", figsize=(10, 8)):
+def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation Heatmap", figsize=(10, 8), **heatmap_kwargs):
     """
     Create a heatmap plot for correlation values.
 
