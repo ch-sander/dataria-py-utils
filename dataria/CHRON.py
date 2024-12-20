@@ -124,7 +124,7 @@ def date_aggregation(
         fig.update_traces(mode='lines+markers')
         plotly_html_path = f"{output_plot_path}_plotly.html"
         fig.write_html(plotly_html_path)
-        fig.show()
+        # fig.show()
         print(f"Plotly plot saved to {plotly_html_path}")
     
     elif plot_type.lower() == 'heatmap':
