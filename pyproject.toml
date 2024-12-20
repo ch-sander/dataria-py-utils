@@ -16,7 +16,11 @@ dependencies = [
     "shapely",
     "folium",
     "matplotlib",
-    "mapclassify"
+    "mapclassify",
+    "plotly",
+    "seaborn",
+    "pandas",
+    
 ]
 
 [tool.setuptools.packages.find]
