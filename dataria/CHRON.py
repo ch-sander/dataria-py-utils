@@ -4,7 +4,7 @@ import seaborn as sns
 import plotly.express as px
 import calendar
 import os
-from DATA import sparql_to_dataframe
+from .DATA import sparql_to_dataframe
 
 def date_aggregation(
     df=None,

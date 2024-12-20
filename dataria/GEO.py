@@ -4,7 +4,7 @@ import geopandas as gpd
 import shapely.wkt
 from shapely.geometry import shape
 import pandas as pd
-from DATA import sparql_to_dataframe
+from .DATA import sparql_to_dataframe
 
 def dataframe_to_geodataframe(df, geo_var, save_GeoJSON=True):
     """

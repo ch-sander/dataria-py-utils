@@ -2,14 +2,20 @@ import pandas as pd
 from scipy.stats import pearsonr
 import seaborn as sns
 import matplotlib.pyplot as plt
+from .DATA import sparql_to_dataframe
 
-def calculate_correlation(df, col1, col2, sep=',', edges=0, save_CSV=True, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True):
+def calculate_correlation(df=None,
+    endpoint_url=None,
+    query=None,
+    col1=None, col2=None, sep=',', edges=0, save_CSV=True, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True):
     """
     Calculate correlations between two DataFrame columns.
     Handles both numerical and string columns. String columns are converted into dummy variables.
 
     Args:
-        df (pd.DataFrame): The input DataFrame.
+        df (pd.DataFrame): The input DataFrame containing the data.
+        endpoint_url (str): The SPARQL endpoint URL to query. Ignored if df or gdf are defined.
+        query (str): The SPARQL query to be executed. Ignored if df or gdf are defined.
         col1 (str): The name of the first column.
         col2 (str): The name of the second column.
         sep (str, optional): Separator for string columns (default: ',').
@@ -24,6 +30,14 @@ def calculate_correlation(df, col1, col2, sep=',', edges=0, save_CSV=True, csv_f
         pd.DataFrame: A DataFrame with correlation and p-value for each dummy variable if needed.
                       Otherwise, a single correlation and p-value.
     """
+    
+    if df is None and endpoint_url and query:
+        try:
+            # Fetch data and create DataFrame
+            df = sparql_to_dataframe(endpoint_url, query)
+        except Exception as e:
+            raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")    
+    
     # Validate that columns exist in the DataFrame
     if col1 not in df.columns or col2 not in df.columns:
         raise ValueError(f"One or both columns '{col1}' and '{col2}' do not exist in the DataFrame.")
