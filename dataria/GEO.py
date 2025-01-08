@@ -91,7 +91,7 @@ def explore(df=None,
     if df is None and endpoint_url and query:
         try:
             # Fetch data and create DataFrame
-            df = sparql_to_dataframe(endpoint_url, query, save_CSV)
+            df = sparql_to_dataframe(endpoint_url, query, save_CSV=None if save_CSV is False else None)
         except Exception as e:
             raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
     
