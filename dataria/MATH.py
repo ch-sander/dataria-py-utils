@@ -179,4 +179,4 @@ def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=Tr
     plt.title(title)
     if save_PNG:
         plt.savefig("correlations.png", dpi=300, format='png')
-    plt.show(
+    plt.show()
