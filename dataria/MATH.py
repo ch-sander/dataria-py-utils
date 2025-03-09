@@ -115,13 +115,13 @@ def correlation(df=None,
     # Plot a heatmap if requested
     if heatmap:
         try:
-            plot_correlation_heatmap(correlation_df, save_PNG, **heatmap_kwargs)
+            plot_correlation_heatmap(correlation_df=correlation_df, save_PNG=save_PNG, **heatmap_kwargs)
         except Exception as e:
             print(f"Failed to plot heatmap: {e}")
 
     return correlation_df
 
-def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation Heatmap", figsize=(10, 8), **heatmap_kwargs):
+def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation", figsize=(10, 8), **heatmap_kwargs):
     """
     Create a heatmap plot for correlation values.
 
@@ -136,7 +136,7 @@ def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=Tr
         temp_df = correlation_df.copy().reset_index()
         plt.figure(figsize=figsize)
         sns.barplot(
-            x='Correlation',
+            x=corr_col,
             y='index',
             data=temp_df,
             palette='viridis',
