@@ -132,36 +132,51 @@ def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=Tr
         figsize (tuple, optional): Size of the heatmap figure. Default is (10, 8).
     """
     correlation_df = correlation_df.dropna()
-    if {'Var_1', 'Var_2', 'Correlation'}.issubset(correlation_df.columns):
-        # Long format
-        heatmap_matrix = correlation_df.pivot(index='Var_1', columns='Var_2', values='Correlation')
-        # As the matrix is symmetrical, fill in the missing values
-        heatmap_matrix = heatmap_matrix.fillna(heatmap_matrix.T)
-    elif correlation_df.shape[0] == correlation_df.shape[1]:
-        # Square matrix, use it directly
-        heatmap_matrix = correlation_df
-    elif correlation_df.shape[1] == 1:
-        # Single correlation value, create a 1x1 matrix
-        correlation = correlation_df.iloc[0,0]
-        heatmap_matrix = pd.DataFrame([[correlation]], index=['Var1'], columns=['Var2'])
+    if {corr_col, 'P-Value'}.issubset(correlation_df.columns) and 'Var_1' not in correlation_df.columns:
+        temp_df = correlation_df.copy().reset_index()
+        plt.figure(figsize=figsize)
+        sns.barplot(
+            x='Correlation',
+            y='index',
+            data=temp_df,
+            palette='viridis',
+            hue='index',
+            **heatmap_kwargs
+        )
+        plt.tight_layout()
     else:
-        try:
-            heatmap_matrix = correlation_df[corr_col].unstack() if isinstance(correlation_df.index, pd.MultiIndex) else correlation_df
-        
-        except:
-            raise ValueError("Unknown format of the correlation DataFrame.")
+      if {'Var_1', 'Var_2', corr_col}.issubset(correlation_df.columns):
+          # Long format
+          heatmap_matrix = correlation_df.pivot(index='Var_1', columns='Var_2', values=corr_col)
+          # As the matrix is symmetrical, fill in the missing values
+          heatmap_matrix = heatmap_matrix.fillna(heatmap_matrix.T)
+      elif correlation_df.shape[0] == correlation_df.shape[1]:
+          # Square matrix, use it directly
+          heatmap_matrix = correlation_df
+      elif correlation_df.shape[1] == 1:
+          # Single correlation value, create a 1x1 matrix
+          correlation = correlation_df.iloc[0,0]
+          heatmap_matrix = pd.DataFrame([[correlation]], index=['Var1'], columns=['Var2'])
+      else:
+          try:
+              heatmap_matrix = correlation_df[corr_col].unstack() if isinstance(correlation_df.index, pd.MultiIndex) else correlation_df
+          
+          except:
+              raise ValueError("Unknown format of the correlation DataFrame.")
 
-    # Create the heatmap
-    plt.figure(figsize=figsize)
-    sns.heatmap(
-        heatmap_matrix,
-        annot=True, 
-        cmap='coolwarm', 
-        fmt=".4f", 
-        linewidths=.5, 
-        cbar_kws={'label': corr_col}
-    )
+      # Create the heatmap
+      plt.figure(figsize=figsize)
+      sns.heatmap(
+          heatmap_matrix,
+          annot=True, 
+          cmap='coolwarm', 
+          fmt=".4f", 
+          linewidths=.5, 
+          cbar_kws={'label': corr_col},
+          **heatmap_kwargs
+      )
+      plt.tight_layout()
     plt.title(title)
     if save_PNG:
         plt.savefig("correlations.png", dpi=300, format='png')
-    plt.show()
+    plt.show(
