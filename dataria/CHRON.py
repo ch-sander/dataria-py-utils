@@ -12,6 +12,8 @@ def date_aggregation(
     query=None,
     date_var='date',
     plot_type='rolling',
+    mode='count',
+    num_var=None,
     window=7,
     output_csv_path='aggregated_data.csv',
     output_plot_path='plot'
@@ -26,6 +28,8 @@ def date_aggregation(
         date_var (str): The name of the column containing date information (default 'date').
         plot_type (str): Type of plot to generate ('rolling' or 'heatmap').
         window (int): Rolling window size in days (used if plot_type='rolling').
+        mode: 'count' (number of events), 'sum' (sum of a column) or 'mean' (average of a column)
+        num_var: Name of the column if mode 'sum' or 'mean' is used
         output_csv_path (str): File path to save the aggregated DataFrame as CSV.
         output_plot_path (str): Base file path to save the plot images (without extension).
         
@@ -64,11 +68,21 @@ def date_aggregation(
     df.set_index(date_var, inplace=True)
     
     if plot_type.lower() == 'rolling':
-        # Aggregation: Count the number of events per day
-        event_counts = df.groupby(df.index).size()
-        
-        # Apply rolling window
-        rolling_window = event_counts.rolling(window=window, min_periods=1).sum()
+        if mode == 'count':
+            daily_values = df.groupby(df.index).size()
+            rolling_window = daily_values.rolling(window=window, min_periods=1).sum()
+        elif mode == 'sum':
+            if num_var is None:
+                raise ValueError("The column name must be specified for the 'sum' mode!")
+            daily_values = df.groupby(df.index)[num_var].sum()
+            rolling_window = daily_values.rolling(window=window, min_periods=1).sum()
+        elif mode == 'mean':
+            if num_var is None:
+                raise ValueError("The column name must be specified for the 'mean' mode!")
+            daily_values = df.groupby(df.index)[num_var].mean()
+            rolling_window = daily_values.rolling(window=window, min_periods=1).mean()
+        else:
+            raise ValueError("Invalid mode. Use 'count', 'sum' or 'mean'.")
         
         # Convert PeriodIndex to strings for plotting
         rolling_window_str = rolling_window.index.strftime('%Y-%m-%d')
