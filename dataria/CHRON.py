@@ -101,7 +101,7 @@ def date_aggregation(
         ### Matplotlib Plot ###
         plt.figure(figsize=(12, 6))
         plt.plot(rolling_window_str, rolling_window.values, marker='o', linestyle='-')
-        plt.title(f'Event Distribution with Rolling Window of {window} Days')
+        plt.title(f'Distribution with Rolling Window of {window} Days')
         plt.xlabel('Date')
         plt.grid(True)
         
@@ -111,7 +111,7 @@ def date_aggregation(
         xticks = rolling_window_str[::step]
         plt.xticks(ticks=range(0, len(rolling_window_str), step), labels=xticks, rotation=45)
         
-        plt.legend(['Number of Events'])
+        plt.legend(['Counter'])
         plt.tight_layout()
         matplotlib_plot_path = f"{output_plot_path}_matplotlib.png"
         plt.savefig(matplotlib_plot_path, dpi=300, format='png')
@@ -122,8 +122,8 @@ def date_aggregation(
         fig = px.line(
             x=rolling_window_str,
             y=rolling_window.values,
-            labels={'x': 'Date', 'y': 'Number of Events'},
-            title=f'Event Distribution with Rolling Window of {window} Days'
+            labels={'x': 'Date', 'y': 'Counter'},
+            title=f'Distribution with Rolling Window of {window} Days'
         )
         
         # Adjust x-axis to show ticks per month
