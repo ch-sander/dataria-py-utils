@@ -3,6 +3,7 @@ from scipy.stats import pearsonr
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import upsetplot as up
 from .DATA import sparql_to_dataframe
 
 def correlation(df=None,
@@ -180,3 +181,48 @@ def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=Tr
     if save_PNG:
         plt.savefig("correlations.png", dpi=300, format='png')
     plt.show()
+
+def upset(
+    df=None, endpoint_url=None, query=None, col_item="item", col_sets="set", sep=",", 
+    save_CSV=True, csv_filename="upset_data.csv", plot_upset=True, save_PNG=True, png_filename="upset_plot.png", **upset_kwargs
+):
+    """
+    Converts a DataFrame with an item column and a delimited set column into a format suitable for upset.js.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame with two columns (item, sets).
+        endpoint_url (str): SPARQL endpoint URL (ignored if df is provided).
+        query (str): SPARQL query to fetch data (ignored if df is provided).
+        col_item (str): Column name for the item (default: "item").
+        col_sets (str): Column name for the sets (default: "set").
+        sep (str): Separator used in the 'sets' column (default: ',').
+        save_CSV (bool): If True, saves the transformed data to a CSV file (default: True).
+        csv_filename (str): Filename for saving the CSV file.
+        plot_upset (bool): If True, generates an UpSet plot.
+        save_PNG (bool): If True, saves the UpSet plot as PNG.
+        png_filename (str): Filename for saving the PNG file.
+        **upset_kwargs: Additional keyword arguments passed to up.UpSet()
+    Returns:
+        pd.DataFrame: Transformed DataFrame suitable for upset.js.
+    """
+
+    if df is None and endpoint_url and query:
+        df = sparql_to_dataframe(endpoint_url, query)
+    if col_item not in df.columns or col_sets not in df.columns:
+        raise ValueError(f"Expected columns '{col_item}' and '{col_sets}' in DataFrame.")
+    df_expanded = df[col_sets].str.get_dummies(sep=sep)
+    df_final = pd.concat([df[[col_item]], df_expanded], axis=1)
+    if save_CSV:
+        df_final.to_csv(csv_filename, index=False)
+    if plot_upset:
+        upset_data = df_final.set_index(col_item).astype(bool)
+        upset_data = upset_data.groupby(list(upset_data.columns)).size()
+        plot = up.UpSet(upset_data,**upset_kwargs)
+        plot.plot()
+        plt.title(f"UpSet Plot")
+        if save_PNG:
+            plt.savefig(png_filename, dpi=300)
+        plt.show()
+        upset_data.info()
+        
+    return df_final
