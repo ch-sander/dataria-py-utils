@@ -103,7 +103,6 @@ def date_aggregation(
         plt.plot(rolling_window_str, rolling_window.values, marker='o', linestyle='-')
         plt.title(f'Event Distribution with Rolling Window of {window} Days')
         plt.xlabel('Date')
-        plt.ylabel('Number of Events')
         plt.grid(True)
         
         # Customize xticks to show approximately monthly ticks
