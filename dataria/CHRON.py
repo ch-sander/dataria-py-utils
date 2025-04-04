@@ -59,6 +59,8 @@ def date_aggregation(
     df[date_var] = df[date_var].apply(
         lambda x: x if isinstance(x, (pd.Period, pd.Timestamp)) else pd.NaT
     )
+
+
     df = df.dropna(subset=[date_var])
     final_count = len(df)
     if final_count < initial_count:
@@ -67,6 +69,10 @@ def date_aggregation(
     # Set the date column as the index and sort
     df.set_index(date_var, inplace=True)
     
+    # Homogenic index as PeriodIndex
+    if not isinstance(df.index, pd.PeriodIndex):
+        df.index = pd.PeriodIndex(df.index, freq='D')
+
     if plot_type.lower() == 'rolling':
         if mode == 'count':
             daily_values = df.groupby(df.index).size()

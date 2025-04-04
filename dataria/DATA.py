@@ -83,7 +83,6 @@ def sparql_to_dataframe(endpoint_url, query, save_CSV="query_result.csv"):
 
     return df_result
 
-import pandas as pd
 
 # def date_to_epoch_ms(date_str):
 #     try:
@@ -104,7 +103,7 @@ def iso_to_period(iso_string):
     except:
       return pd.NaT
 
-def parse_xsd_date_or_datetime(iso_string, dtype, unix_year=1700):
+def parse_xsd_date_or_datetime(iso_string, dtype, unix_year=1950):
     """
     Parses an xsd:date or xsd:dateTime string into a Pandas Timestamp or Period.
     For dates before the specified `unix_year`, a Period is used or the string is retained.
