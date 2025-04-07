@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import upsetplot as up
+from fuzzywuzzy import fuzz
 from .DATA import sparql_to_dataframe
 
 def correlation(df=None,
@@ -226,3 +227,129 @@ def upset(
         upset_data.info()
         
     return df_final
+
+def fuzzy_compare(df1=None,df2=None,
+    endpoint_url=None,
+    query=None,
+    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, save_CSV=True, csv_filename="comparison.csv"):
+    """
+    Args:
+        df1 (pd.DataFrame): The input DataFrame containing the data.
+        df2 (pd.DataFrame): The input DataFrame containing the data.
+        endpoint_url (str): The SPARQL endpoint URL to query. Ignored if df or gdf are defined.
+        query (str): The SPARQL query to be executed. Ignored if df or gdf are defined.
+        grouping_var (str, optional): The name of column to aggregate on.
+        label_var (str, optional): The name of the column to match on.
+        element_var (str): The name of the column to compare.
+        threshold (int): The threshold for fuzzy compare.
+        match_all (bool, optional): If True, only return grouped results for a full match accross all elements.
+        unique_rows (bool, optional): If True, only return one row per hit.
+        save_CSV (bool, optional): If True, saves the correlation DataFrame as a CSV file. Default is True.
+        csv_filename (str, optional): The filename for saving the CSV file. Default is "comparison.csv".
+
+    Returns:
+        pd.DataFrame: A DataFrame with each element compared against all other elements.
+    """
+
+    if df1 is None and endpoint_url and query:
+        try:
+            # Fetch data and create DataFrame
+            df1 = sparql_to_dataframe(endpoint_url, query)
+        except Exception as e:
+            raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
+
+    if df2 is None and endpoint_url and query:
+        try:
+            # Fetch data and create DataFrame
+            df2 = sparql_to_dataframe(endpoint_url, query)
+        except Exception as e:
+            raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
+
+    if df2 is None:
+        df2 = df1
+
+    # Validate that columns exist in the DataFrame
+    if element_var not in df1.columns or element_var not in df2.columns:
+        raise ValueError(f"Column '{element_var}' do not exist in the DataFrame.")
+
+    grouping = False
+    # Grouping only if grouping_var is set and present in both DataFrames.
+    if grouping_var and grouping_var in df1.columns and grouping_var in df2.columns:
+        grouping = True
+        groups_df1 = {g: group for g, group in df1.groupby(grouping_var)}
+        groups_df2 = {g: group for g, group in df2.groupby(grouping_var)}
+    else:
+        groups_df1 = {'all': df1}
+        groups_df2 = {'all': df2}
+
+    # Optional: Check whether there are values in the Label column in both DataFrames.
+    if label_var in df1.columns and label_var in df2.columns and df1[label_var].notna().any() and df2[label_var].notna().any():
+        check_label = True
+    else:
+        check_label = False
+
+    matches = []
+
+    # Compare all combinations of the (optionally grouped) DataFrames
+    for group_key2, group2 in groups_df2.items():
+        for group_key1, group1 in groups_df1.items():
+            if grouping and group_key2 == group_key1:
+                continue
+            if grouping and group_key1 >= group_key2 and unique_rows:
+                continue
+            for _, row2 in group2.iterrows():
+                for _, row1 in group1.iterrows():
+                    # If check_label, the labels must match.
+                    # Maybe add score = 0 for non existing row1?
+                    if check_label and row2[label_var] != row1[label_var]:
+                        continue
+
+                    if threshold >= 100:
+                        if row2[element_var].lower() == row1[element_var].lower():
+                            score = 100
+                        else:
+                            score = 0
+                    else:
+                        score = fuzz.ratio(row2[element_var].lower(), row1[element_var].lower())
+
+                    matches.append({
+                        'group2': group_key2,
+                        'group1': group_key1,
+                        'label': row2[label_var] if check_label else None,
+                        'element2': row2[element_var],
+                        'element1': row1[element_var],
+                        'score': score
+                    })
+
+    matches_df = pd.DataFrame(matches)
+    aggregated = pd.DataFrame()
+
+    if not match_all:
+        matches_df = matches_df[matches_df['score'] >= threshold]
+
+    if not matches_df.empty:
+        aggregated = matches_df.groupby(['group1', 'group2']).agg(
+            Labels=('label', lambda x: ", ".join(sorted(set(x)))),
+            df1_Elements=('element1', lambda x: ", ".join(sorted(set(x)))),
+            df2_Elements=('element2', lambda x: ", ".join(sorted(set(x)))),
+            Num_Matches=('score', 'count'),
+            Average_Score=('score', 'mean'),
+            Min_Score=('score', 'min'),
+            Max_Score=('score', 'max')
+        ).reset_index()
+    else:
+        aggregated = pd.DataFrame()
+
+    if match_all and grouping:
+        aggregated = aggregated[aggregated['Min_Score'] >= threshold]
+
+    aggregated = aggregated[aggregated['Max_Score'] >= threshold]
+
+    # Save the correlation DataFrame as a CSV file
+    if save_CSV:
+        try:
+            aggregated.to_csv(csv_filename)
+        except Exception as e:
+            print(f"Failed to save CSV file '{csv_filename}': {e}")
+
+    return aggregated
