@@ -320,9 +320,10 @@ def fuzzy_compare(df1=None,df2=None,
                         'element1': row1[element_var],
                         'score': score
                     })
-
+    
     matches_df = pd.DataFrame(matches)
     aggregated = pd.DataFrame()
+    print(matches_df.info())
 
     if not match_all:
         matches_df = matches_df[matches_df['score'] >= threshold]
@@ -337,14 +338,19 @@ def fuzzy_compare(df1=None,df2=None,
             Min_Score=('score', 'min'),
             Max_Score=('score', 'max')
         ).reset_index()
+        print(aggregated.info())
     else:
         aggregated = pd.DataFrame()
+        print("aggregated dataframe is empty!")
+        return aggregated
+    
+
 
     if match_all and grouping:
         aggregated = aggregated[aggregated['Min_Score'] >= threshold]
 
     aggregated = aggregated[aggregated['Max_Score'] >= threshold]
-
+    print(len(aggregated))
     # Save the correlation DataFrame as a CSV file
     if save_CSV:
         try:
