@@ -117,10 +117,10 @@ def date_aggregation(
         plt.show()
         if len(png_filename) > 0 and png_filename is not None:
             try:
-                plt.savefig(f"{plot_type.lower}_{png_filename}", dpi=300, format='png')
-                print(f"Matplotlib plot saved to {plot_type.lower}_{png_filename}")
+                plt.savefig(f"{plot_type.lower()}_{png_filename}", dpi=300, format='png')
+                print(f"Matplotlib plot saved to {plot_type.lower()}_{png_filename}")
             except Exception as e:
-                print(f"Failed to save file '{plot_type.lower}_{png_filename}': {e}")
+                print(f"Failed to save file '{plot_type.lower()}_{png_filename}': {e}")
         
         ### Plotly Plot ###
         fig = px.line(
@@ -202,10 +202,10 @@ def date_aggregation(
 
         if len(png_filename) > 0 and png_filename is not None:
             try:
-                plt.savefig(f"{plot_type.lower}_{png_filename}", dpi=300, format='png')
-                print(f"Matplotlib plot saved to {plot_type.lower}_{png_filename}")
+                plt.savefig(f"{plot_type.lower()}_{png_filename}", dpi=300, format='png')
+                print(f"Matplotlib plot saved to {plot_type.lower()}_{png_filename}")
             except Exception as e:
-                print(f"Failed to save file '{plot_type.lower}_{png_filename}': {e}")
+                print(f"Failed to save file '{plot_type.lower()}_{png_filename}': {e}")
     
     else:
         raise ValueError("Invalid plot_type. Choose 'rolling' or 'heatmap'.")
