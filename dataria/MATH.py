@@ -10,7 +10,7 @@ from .DATA import sparql_to_dataframe
 def correlation(df=None,
     endpoint_url=None,
     query=None,
-    col1=None, col2=None, sep=',', edges=0, save_CSV=True, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True):
+    col1=None, col2=None, sep=',', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True):
     """
     Calculate correlations between two DataFrame columns.
     Handles both numerical and string columns. String columns are converted into dummy variables.
@@ -23,8 +23,7 @@ def correlation(df=None,
         col2 (str): The name of the second column.
         sep (str, optional): Separator for string columns (default: ',').
         edges (int, optional): Number of top and bottom rows to return from the correlation DataFrame. Default is 0 (no truncation).
-        save_CSV (bool, optional): If True, saves the correlation DataFrame as a CSV file. Default is True.
-        csv_filename (str, optional): The filename for saving the CSV file. Default is "correlations.csv".
+        csv_filename (str, optional): The filename for saving the CSV file.
         heatmap (bool, optional): If True, plots a heatmap of correlations. Default is True.
         heatmap_kwargs (dict, optional): Additional arguments for the heatmap plot.
         save_PNG (bool, optional): If True, saves the correlation heatmap as a PNG file. Default is True.
@@ -37,7 +36,7 @@ def correlation(df=None,
     if df is None and endpoint_url and query:
         try:
             # Fetch data and create DataFrame
-            df = sparql_to_dataframe(endpoint_url, query)
+            df = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query_{csv_filename}" if csv_filename is not None else None)
         except Exception as e:
             raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")    
     
@@ -108,7 +107,7 @@ def correlation(df=None,
         correlation_df = pd.concat([correlation_df.head(edges), correlation_df.tail(edges)])
 
     # Save the correlation DataFrame as a CSV file
-    if save_CSV:
+    if len(csv_filename) > 0 and csv_filename is not None:
         try:
             correlation_df.to_csv(csv_filename)
         except Exception as e:
@@ -185,7 +184,7 @@ def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=Tr
 
 def upset(
     df=None, endpoint_url=None, query=None, col_item="item", col_sets="set", sep=",", 
-    save_CSV=True, csv_filename="upset_data.csv", plot_upset=True, save_PNG=True, png_filename="upset_plot.png", **upset_kwargs
+    csv_filename="upset_data.csv", plot_upset=True, png_filename="upset_plot.png", **upset_kwargs
 ):
     """
     Converts a DataFrame with an item column and a delimited set column into a format suitable for upset.js.
@@ -197,10 +196,8 @@ def upset(
         col_item (str): Column name for the item (default: "item").
         col_sets (str): Column name for the sets (default: "set").
         sep (str): Separator used in the 'sets' column (default: ',').
-        save_CSV (bool): If True, saves the transformed data to a CSV file (default: True).
         csv_filename (str): Filename for saving the CSV file.
         plot_upset (bool): If True, generates an UpSet plot.
-        save_PNG (bool): If True, saves the UpSet plot as PNG.
         png_filename (str): Filename for saving the PNG file.
         **upset_kwargs: Additional keyword arguments passed to up.UpSet()
     Returns:
@@ -208,21 +205,25 @@ def upset(
     """
 
     if df is None and endpoint_url and query:
-        df = sparql_to_dataframe(endpoint_url, query)
+        df = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query_{csv_filename}" if csv_filename is not None else None)
     if col_item not in df.columns or col_sets not in df.columns:
         raise ValueError(f"Expected columns '{col_item}' and '{col_sets}' in DataFrame.")
     df_expanded = df[col_sets].str.get_dummies(sep=sep)
     df_final = pd.concat([df[[col_item]], df_expanded], axis=1)
-    if save_CSV:
+
+    if len(csv_filename) > 0 and csv_filename is not None:
         df_final.to_csv(csv_filename, index=False)
+
     if plot_upset:
         upset_data = df_final.set_index(col_item).astype(bool)
         upset_data = upset_data.groupby(list(upset_data.columns)).size()
         plot = up.UpSet(upset_data,**upset_kwargs)
         plot.plot()
         plt.title(f"UpSet Plot")
-        if save_PNG:
+
+        if len(png_filename) > 0 and png_filename is not None:
             plt.savefig(png_filename, dpi=300)
+
         plt.show()
         upset_data.info()
         
@@ -231,7 +232,7 @@ def upset(
 def fuzzy_compare(df1=None,df2=None,
     endpoint_url=None,
     query=None,
-    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, save_CSV=True, csv_filename="comparison.csv"):
+    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv"):
     """
     Args:
         df1 (pd.DataFrame): The input DataFrame containing the data.
@@ -244,7 +245,6 @@ def fuzzy_compare(df1=None,df2=None,
         threshold (int): The threshold for fuzzy compare.
         match_all (bool, optional): If True, only return grouped results for a full match accross all elements.
         unique_rows (bool, optional): If True, only return one row per hit.
-        save_CSV (bool, optional): If True, saves the correlation DataFrame as a CSV file. Default is True.
         csv_filename (str, optional): The filename for saving the CSV file. Default is "comparison.csv".
 
     Returns:
@@ -254,14 +254,14 @@ def fuzzy_compare(df1=None,df2=None,
     if df1 is None and endpoint_url and query:
         try:
             # Fetch data and create DataFrame
-            df1 = sparql_to_dataframe(endpoint_url, query)
+            df1 = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query1_{csv_filename}" if csv_filename is not None else None)
         except Exception as e:
             raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
 
     if df2 is None and endpoint_url and query:
         try:
             # Fetch data and create DataFrame
-            df2 = sparql_to_dataframe(endpoint_url, query)
+            df2 = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query2_{csv_filename}" if csv_filename is not None else None)
         except Exception as e:
             raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
 
@@ -352,7 +352,7 @@ def fuzzy_compare(df1=None,df2=None,
     aggregated = aggregated[aggregated['Max_Score'] >= threshold]
     print(len(aggregated))
     # Save the correlation DataFrame as a CSV file
-    if save_CSV:
+    if len(csv_filename) > 0 and csv_filename is not None:
         try:
             aggregated.to_csv(csv_filename)
         except Exception as e:

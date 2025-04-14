@@ -5,7 +5,7 @@ from shapely.geometry import shape
 import pandas as pd
 from datetime import datetime, timezone
 
-def sparql_to_dataframe(endpoint_url, query, save_CSV="query_result.csv"):
+def sparql_to_dataframe(endpoint_url, query, csv_filename="query_result.csv"):
     """
     Executes a SPARQL query and returns the results as a Pandas DataFrame.
     Geometries and date values are parsed based on their data types.
@@ -13,7 +13,7 @@ def sparql_to_dataframe(endpoint_url, query, save_CSV="query_result.csv"):
     Args:
         endpoint_url (str): The SPARQL endpoint URL.
         query (str): The SPARQL query string.
-        save_CSV (str): If not None, saves the result as a CSV file to the given path.
+        csv_filename (str): If not None, saves the result as a CSV file to the given path.
 
     Returns:
         pd.DataFrame: A DataFrame containing the SPARQL query results.
@@ -78,8 +78,8 @@ def sparql_to_dataframe(endpoint_url, query, save_CSV="query_result.csv"):
     df_result = pd.DataFrame(rows)
 
     # Optionally save the result as CSV
-    if save_CSV:
-        df_result.to_csv(save_CSV, index=False)
+    if len(csv_filename) > 0 and csv_filename is not None:
+        df_result.to_csv(csv_filename, index=False)
 
     return df_result
 

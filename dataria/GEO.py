@@ -6,7 +6,7 @@ from shapely.geometry import shape
 import pandas as pd
 from .DATA import sparql_to_dataframe
 
-def dataframe_to_geodataframe(df, geo_var, save_GeoJSON=True):
+def dataframe_to_geodataframe(df, geo_var, json_filename="result_explore.geojson"):
     """
     Convert a Pandas DataFrame into a GeoPandas GeoDataFrame using a specified geometry column.
     The geometry column is removed from the DataFrame columns and set as the geometry in the GeoDataFrame.
@@ -29,9 +29,9 @@ def dataframe_to_geodataframe(df, geo_var, save_GeoJSON=True):
     # Create the GeoDataFrame and drop the geometry column from the DataFrame
     gdf = gpd.GeoDataFrame(df.drop(columns=[geo_var]), geometry=df[geo_var], crs="EPSG:4326")
 
-    if save_GeoJSON:
+    if len(json_filename) > 0 and json_filename is not None:
         try:
-            gdf.to_file("result_query.geojson", driver="GeoJSON")
+            gdf.to_file(json_filename, driver="GeoJSON")
         except Exception as e:
             print(f"Warning: Failed to save GeoJSON file. Error: {e}")
 
@@ -42,11 +42,10 @@ def explore(df=None,
             endpoint_url=None,
             query=None,
             geo_var='geom',
-            label_var='label',
             cluster_weight_var='cluster',
-            save_CSV=True,
-            save_GeoJSON=True,
-            save_HTML=True,
+            csv_filename="query_geodata.csv",
+            json_filename="result_explore.geojson",
+            html_filename="result_map.html",
             **explore_kwargs):
     """
     Executes a SPARQL query against a specified endpoint, transforms the results into a GeoDataFrame,
@@ -63,17 +62,15 @@ def explore(df=None,
             The SPARQL query to be executed. Ignored if df or gdf are defined.
         geo_var : str, optional
             The variable name in the SPARQL query that contains geometry data. Default is 'geom'.
-        label_var : str, optional
-            The variable name in the SPARQL query for labels (e.g., rdfs:label). Default is 'label'.
         cluster_weight_var : str, optional
             The variable name containing clustering or weighting values to customize map visualization.
             If None or not present, this column will be ignored. Default is 'cluster'.
-        save_CSV : bool, optional
-            If True, saves the resulting dataframe as an CSV file. Default is True.
-        save_GeoJSON : bool, optional
-            If True, saves the GeoDataFrame as a GeoJSON file. Default is True.
-        save_HTML : bool, optional
-            If True, saves the resulting map as an HTML file. Default is True.
+        csv_filename : bool, optional
+            Saves the resulting dataframe as an CSV file.
+        json_filename : str, optional
+            Saves the GeoDataFrame as a GeoJSON file.
+        html_filename : str, optional
+            Saves the resulting map as an HTML file.
         **explore_kwargs:
             Additional keyword arguments passed to gdf.explore() for customizing the map.
 
@@ -91,14 +88,14 @@ def explore(df=None,
     if df is None and endpoint_url and query:
         try:
             # Fetch data and create DataFrame
-            df = sparql_to_dataframe(endpoint_url, query, save_CSV=None if save_CSV is False else None)
+            df = sparql_to_dataframe(endpoint_url, query, csv_filename)
         except Exception as e:
             raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
     
     if gdf is None and df is not None:
         try:
             # Create GeoDataFrame
-            gdf = dataframe_to_geodataframe(df, geo_var, save_GeoJSON)
+            gdf = dataframe_to_geodataframe(df, geo_var, json_filename)
         except ValueError as ve:
             raise ValueError(f"GeoDataFrame creation failed. Ensure '{geo_var}' exists and contains valid geometries. Error: {ve}")
         except Exception as e:
@@ -128,15 +125,15 @@ def explore(df=None,
         raise ValueError(f"Failed to generate map using gdf.explore(). Error: {e}")
 
     # Optionally save GeoJSON and HTML
-    if save_GeoJSON:
+    if len(json_filename) > 0 and json_filename is not None:
         try:
-            gdf.to_file("result_explore.geojson", driver="GeoJSON")
+            gdf.to_file(json_filename, driver="GeoJSON")
         except Exception as e:
             print(f"Warning: Failed to save GeoJSON file. Error: {e}")
-
-    if save_HTML:
+            
+    if len(html_filename) > 0 and html_filename is not None:
         try:
-            m.save("result_map.html")
+            m.save(html_filename)
         except Exception as e:
             print(f"Warning: Failed to save HTML map file. Error: {e}")
 

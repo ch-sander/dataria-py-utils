@@ -15,8 +15,9 @@ def date_aggregation(
     mode='count',
     num_var=None,
     window=7,
-    output_csv_path='aggregated_data.csv',
-    output_plot_path='plot'
+    csv_filename='time_aggregated_data.csv',
+    png_filename='time_plot.png',
+    html_filename='time_render.html'
 ):
     """
     Generates aggregated plots based on a date column in the DataFrame.
@@ -30,27 +31,17 @@ def date_aggregation(
         window (int): Rolling window size in days (used if plot_type='rolling').
         mode: 'count' (number of events), 'sum' (sum of a column) or 'mean' (average of a column)
         num_var: Name of the column if mode 'sum' or 'mean' is used
-        output_csv_path (str): File path to save the aggregated DataFrame as CSV.
-        output_plot_path (str): Base file path to save the plot images (without extension).
-        
+        csv_filename (str): File path to save the aggregated DataFrame as CSV.
+        png_filename (str): file path to save the plot images.
+        html_filename: file path to save the HTML render.
     Returns:
         None
     """
     
-    # Ensure the output directories exist
-    csv_dir = os.path.dirname(output_csv_path)
-    plot_dir = os.path.dirname(output_plot_path)
-    
-    if csv_dir and not os.path.exists(csv_dir):
-        os.makedirs(csv_dir)
-    
-    if plot_dir and not os.path.exists(plot_dir):
-        os.makedirs(plot_dir)
-    
     if df is None and endpoint_url and query:
         try:
             # Fetch data and create DataFrame
-            df = sparql_to_dataframe(endpoint_url, query)
+            df = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query_{csv_filename}" if csv_filename is not None else None)
         except Exception as e:
             raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
     
@@ -101,8 +92,12 @@ def date_aggregation(
         
         # Save the aggregated DataFrame to CSV
         aggregated_df_sorted = aggregated_df.sort_values('Date')
-        aggregated_df_sorted.to_csv(output_csv_path, index=False)
-        print(f"Aggregated data saved to {output_csv_path}")
+        if len(csv_filename) > 0 and csv_filename is not None:
+            try:
+                aggregated_df_sorted.to_csv(csv_filename, index=False)
+                print(f"Aggregated data saved to {csv_filename}")
+            except Exception as e:
+                print(f"Failed to save CSV file '{csv_filename}': {e}")
         
         ### Matplotlib Plot ###
         plt.figure(figsize=(12, 6))
@@ -119,10 +114,13 @@ def date_aggregation(
         
         plt.legend(['Counter'])
         plt.tight_layout()
-        matplotlib_plot_path = f"{output_plot_path}_matplotlib.png"
-        plt.savefig(matplotlib_plot_path, dpi=300, format='png')
         plt.show()
-        print(f"Matplotlib plot saved to {matplotlib_plot_path}")
+        if len(png_filename) > 0 and png_filename is not None:
+            try:
+                plt.savefig(f"{plot_type.lower}_{png_filename}", dpi=300, format='png')
+                print(f"Matplotlib plot saved to {plot_type.lower}_{png_filename}")
+            except Exception as e:
+                print(f"Failed to save file '{plot_type.lower}_{png_filename}': {e}")
         
         ### Plotly Plot ###
         fig = px.line(
@@ -141,10 +139,15 @@ def date_aggregation(
         )
         
         fig.update_traces(mode='lines+markers')
-        plotly_html_path = f"{output_plot_path}_plotly.html"
-        fig.write_html(plotly_html_path)
+        if len(html_filename) > 0 and html_filename is not None:
+            try:
+                fig.write_html(html_filename)
+                print(f"Plotly plot saved to {html_filename}")
+            except Exception as e:
+                print(f"Failed to save file '{html_filename}': {e}")
+        
         # fig.show()
-        print(f"Plotly plot saved to {plotly_html_path}")
+
     
     elif plot_type.lower() == 'heatmap':
         # Add 'weekday' and 'month' columns
@@ -171,8 +174,14 @@ def date_aggregation(
         
         # Save the aggregated DataFrame to CSV
         aggregated_df = heatmap_data.reset_index()
-        aggregated_df.to_csv(output_csv_path, index=False)
-        print(f"Aggregated heatmap data saved to {output_csv_path}")
+
+        if len(csv_filename) > 0 and csv_filename is not None:
+            try:
+                aggregated_df.to_csv(csv_filename, index=False)
+                print(f"Heatmap data saved to {csv_filename}")
+            except Exception as e:
+                print(f"Failed to save CSV file '{csv_filename}': {e}")
+
         
         ### Seaborn Heatmap ###
         plt.figure(figsize=(14, 10))
@@ -189,10 +198,14 @@ def date_aggregation(
         plt.xticks(rotation=45, fontsize=10)
         plt.yticks(rotation=0, fontsize=10)
         plt.tight_layout()
-        heatmap_plot_path = f"{output_plot_path}_heatmap.png"
-        plt.savefig(heatmap_plot_path, dpi=300, format='png')
         plt.show()
-        print(f"Heatmap plot saved to {heatmap_plot_path}")
+
+        if len(png_filename) > 0 and png_filename is not None:
+            try:
+                plt.savefig(f"{plot_type.lower}_{png_filename}", dpi=300, format='png')
+                print(f"Matplotlib plot saved to {plot_type.lower}_{png_filename}")
+            except Exception as e:
+                print(f"Failed to save file '{plot_type.lower}_{png_filename}': {e}")
     
     else:
         raise ValueError("Invalid plot_type. Choose 'rolling' or 'heatmap'.")
