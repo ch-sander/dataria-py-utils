@@ -12,25 +12,25 @@ def correlation(df=None,
     query=None,
     col1=None, col2=None, sep=',', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True):
     """
-    Calculate correlations between two DataFrame columns.
-    Handles both numerical and string columns. String columns are converted into dummy variables.
+    Compute correlations between two columns of a DataFrame, including support for categorical (string) data.
+
+    This function calculates Pearson correlations, handles dummy encoding for categorical data, supports SPARQL-based data retrieval, and can generate a heatmap of the results.
 
     Args:
-        df (pd.DataFrame): The input DataFrame containing the data.
-        endpoint_url (str): The SPARQL endpoint URL to query. Ignored if df or gdf are defined.
-        query (str): The SPARQL query to be executed. Ignored if df or gdf are defined.
-        col1 (str): The name of the first column.
-        col2 (str): The name of the second column.
-        sep (str, optional): Separator for string columns (default: ',').
-        edges (int, optional): Number of top and bottom rows to return from the correlation DataFrame. Default is 0 (no truncation).
-        csv_filename (str, optional): The filename for saving the CSV file.
-        heatmap (bool, optional): If True, plots a heatmap of correlations. Default is True.
-        heatmap_kwargs (dict, optional): Additional arguments for the heatmap plot.
-        save_PNG (bool, optional): If True, saves the correlation heatmap as a PNG file. Default is True.
+        df (pd.DataFrame, optional): The input DataFrame. If not provided, SPARQL must be used.
+        endpoint_url (str, optional): SPARQL endpoint URL.
+        query (str, optional): SPARQL query string.
+        col1 (str): Name of the first column to compare.
+        col2 (str): Name of the second column to compare.
+        sep (str, optional): Separator for multi-value string fields. Default is ','.
+        edges (int, optional): If > 0, only returns top and bottom N correlations.
+        csv_filename (str, optional): File path to save the result as CSV.
+        heatmap (bool, optional): Whether to generate a heatmap. Default is True.
+        heatmap_kwargs (dict, optional): Additional kwargs passed to the heatmap function.
+        save_PNG (bool, optional): Whether to save the heatmap as a PNG file.
 
     Returns:
-        pd.DataFrame: A DataFrame with correlation and p-value for each dummy variable if needed.
-                      Otherwise, a single correlation and p-value.
+        pd.DataFrame: A DataFrame containing correlation values and p-values.
     """
     
     if df is None and endpoint_url and query:
@@ -124,14 +124,22 @@ def correlation(df=None,
 
 def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation", figsize=(10, 8), **heatmap_kwargs):
     """
-    Create a heatmap plot for correlation values.
+    Generate a heatmap plot from a correlation DataFrame.
+
+    Supports various matrix formats (wide, long, 1x1) and visual customization.
 
     Args:
-        correlation_df (pd.DataFrame): A DataFrame containing correlation results. 
-                                       Index should contain variable names.
-        title (str, optional): Title of the heatmap. Default is "Correlation Heatmap".
-        figsize (tuple, optional): Size of the heatmap figure. Default is (10, 8).
+        correlation_df (pd.DataFrame): DataFrame containing correlation values.
+        corr_col (str): Name of the correlation column. Default is "Correlation".
+        save_PNG (bool): Whether to save the heatmap as a PNG.
+        title (str): Title of the plot.
+        figsize (tuple): Size of the figure (width, height).
+        **heatmap_kwargs: Additional arguments for `seaborn.heatmap` or `seaborn.barplot`.
+
+    Returns:
+        None
     """
+
     correlation_df = correlation_df.dropna()
     if {corr_col, 'P-Value'}.issubset(correlation_df.columns) and 'Var_1' not in correlation_df.columns:
         temp_df = correlation_df.copy().reset_index()
@@ -187,22 +195,26 @@ def upset(
     csv_filename="upset_data.csv", plot_upset=True, png_filename="upset_plot.png", **upset_kwargs
 ):
     """
-    Converts a DataFrame with an item column and a delimited set column into a format suitable for upset.js.
+    Generate an UpSet plot and/or a DataFrame suitable for upset.js from set membership data.
+
+    Useful for visualizing overlapping categories or tag combinations. Data can be provided via SPARQL or directly as a DataFrame.
 
     Args:
-        df (pd.DataFrame): Input DataFrame with two columns (item, sets).
-        endpoint_url (str): SPARQL endpoint URL (ignored if df is provided).
-        query (str): SPARQL query to fetch data (ignored if df is provided).
-        col_item (str): Column name for the item (default: "item").
-        col_sets (str): Column name for the sets (default: "set").
-        sep (str): Separator used in the 'sets' column (default: ',').
-        csv_filename (str): Filename for saving the CSV file.
-        plot_upset (bool): If True, generates an UpSet plot.
-        png_filename (str): Filename for saving the PNG file.
-        **upset_kwargs: Additional keyword arguments passed to up.UpSet()
+        df (pd.DataFrame, optional): Input DataFrame.
+        endpoint_url (str, optional): SPARQL endpoint URL.
+        query (str, optional): SPARQL query.
+        col_item (str): Name of the item column. Default is "item".
+        col_sets (str): Name of the set membership column. Default is "set".
+        sep (str): Separator used in set column. Default is ','.
+        csv_filename (str): File path to save the transformed DataFrame.
+        plot_upset (bool): Whether to generate an UpSet plot.
+        png_filename (str): File path to save the UpSet plot as PNG.
+        **upset_kwargs: Additional arguments for `up.UpSet()`.
+
     Returns:
-        pd.DataFrame: Transformed DataFrame suitable for upset.js.
+        pd.DataFrame: The transformed DataFrame (one-hot encoded for sets).
     """
+
 
     if df is None and endpoint_url and query:
         df = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query_{csv_filename}" if csv_filename is not None else None)
@@ -234,22 +246,27 @@ def fuzzy_compare(df1=None,df2=None,
     query=None,
     grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv"):
     """
+    Fuzzy string matching between two DataFrames (or SPARQL query results) based on a common element column.
+
+    Supports optional grouping, label filtering, and aggregation of match statistics.
+
     Args:
-        df1 (pd.DataFrame): The input DataFrame containing the data.
-        df2 (pd.DataFrame): The input DataFrame containing the data.
-        endpoint_url (str): The SPARQL endpoint URL to query. Ignored if df or gdf are defined.
-        query (str): The SPARQL query to be executed. Ignored if df or gdf are defined.
-        grouping_var (str, optional): The name of column to aggregate on.
-        label_var (str, optional): The name of the column to match on.
-        element_var (str): The name of the column to compare.
-        threshold (int): The threshold for fuzzy compare.
-        match_all (bool, optional): If True, only return grouped results for a full match accross all elements.
-        unique_rows (bool, optional): If True, only return one row per hit.
-        csv_filename (str, optional): The filename for saving the CSV file. Default is "comparison.csv".
+        df1 (pd.DataFrame, optional): First DataFrame.
+        df2 (pd.DataFrame, optional): Second DataFrame. If not provided, df1 is used.
+        endpoint_url (str, optional): SPARQL endpoint.
+        query (str, optional): SPARQL query.
+        grouping_var (str, optional): Column name used for grouping.
+        label_var (str, optional): Optional label for filtering matches.
+        element_var (str): Column containing the string values to compare.
+        threshold (int): Fuzzy matching threshold (0–100). Default: 95.
+        match_all (bool): If True, only include groups where all scores exceed the threshold.
+        unique_rows (bool): If True, suppress duplicate pairings.
+        csv_filename (str): File path to save the results.
 
     Returns:
-        pd.DataFrame: A DataFrame with each element compared against all other elements.
+        pd.DataFrame: Aggregated match statistics between df1 and df2 (or within df1).
     """
+
 
     if df1 is None and endpoint_url and query:
         try:

@@ -7,17 +7,20 @@ from datetime import datetime, timezone
 
 def sparql_to_dataframe(endpoint_url, query, csv_filename="query_result.csv"):
     """
-    Executes a SPARQL query and returns the results as a Pandas DataFrame.
-    Geometries and date values are parsed based on their data types.
+    Execute a SPARQL query and convert the results into a Pandas DataFrame.
+
+    Supports parsing of geometry (WKT, GeoJSON), numeric types, and xsd:date/xsd:dateTime fields.
+    Can optionally save results as CSV.
 
     Args:
-        endpoint_url (str): The SPARQL endpoint URL.
-        query (str): The SPARQL query string.
-        csv_filename (str): If not None, saves the result as a CSV file to the given path.
+        endpoint_url (str): SPARQL endpoint URL.
+        query (str): SPARQL query string.
+        csv_filename (str): Path to save the CSV result. If None, no file is written.
 
     Returns:
-        pd.DataFrame: A DataFrame containing the SPARQL query results.
+        pd.DataFrame: The query results as a DataFrame with parsed values.
     """
+
     # Initialize SPARQL Wrapper
     sparql = SPARQLWrapper(endpoint_url)
     sparql.setQuery(query)
@@ -96,6 +99,17 @@ def sparql_to_dataframe(endpoint_url, query, csv_filename="query_result.csv"):
 #         return None
 
 def iso_to_period(iso_string):
+    """
+    Convert an ISO date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) to a Pandas Period.
+
+    Intended for historical date handling when datetime parsing is not viable.
+
+    Args:
+        iso_string (str): ISO 8601 date string.
+
+    Returns:
+        pd.Period or pd.NaT: A Period with daily frequency or NaT if parsing fails.
+    """
     parts = iso_string.split("T")[0]
     try:
       year, month, day = map(int, parts.split("-"))
@@ -105,17 +119,20 @@ def iso_to_period(iso_string):
 
 def parse_xsd_date_or_datetime(iso_string, dtype, unix_year=1950):
     """
-    Parses an xsd:date or xsd:dateTime string into a Pandas Timestamp or Period.
-    For dates before the specified `unix_year`, a Period is used or the string is retained.
-    
+    Parse xsd:date or xsd:dateTime strings into Pandas datetime or period values.
+
+    Automatically handles early historical dates by converting them into Periods
+    to avoid datetime parsing issues (e.g., pre-1950).
+
     Args:
-        iso_string (str): The ISO date or datetime string.
-        dtype (str): The data type (xsd:date or xsd:dateTime).
-        unix_year (int): The year before which dates will be converted to periods or retained as strings.
-    
+        iso_string (str): ISO-formatted date or datetime string.
+        dtype (str): Expected data type (e.g. xsd:date or xsd:dateTime).
+        unix_year (int): Dates earlier than this year are treated as historical (default: 1950).
+
     Returns:
-        pd.Timestamp, pd.Period, or str: The parsed date/time or the original string in case of errors.
+        pd.Timestamp or pd.Period: Parsed date/time object, or NaT on failure.
     """
+
     try:
         # Remove the trailing "Z" if present
         if iso_string.endswith("Z"):

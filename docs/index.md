@@ -3,7 +3,7 @@
 ```
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 5
 :caption: Navigation
 
 autoapi/index

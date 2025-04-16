@@ -1,3 +1,9 @@
+"""
+Visualization and aggregation of time-based data.
+
+This module provides functionality to generate rolling time series plots and calendar heatmaps based on a date column. Input data can be provided via a DataFrame or fetched dynamically using a SPARQL query. Outputs include CSV summaries, Matplotlib and Plotly visualizations.
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -20,20 +26,23 @@ def date_aggregation(
     html_filename='time_render.html'
 ):
     """
-    Generates aggregated plots based on a date column in the DataFrame.
-    
+    Aggregates and visualizes event data based on a date column.
+
+    The function generates either a rolling time series plot or a heatmap grouped by weekday and month. Input data can be passed as a DataFrame or fetched from a SPARQL endpoint. Aggregated data and plots can be saved as CSV, PNG, and HTML files.
+
     Args:
-        df (pd.DataFrame): The input DataFrame containing the data.
-        endpoint_url (str): The SPARQL endpoint URL to query. Ignored if df or gdf are defined.
-        query (str): The SPARQL query to be executed. Ignored if df or gdf are defined.
-        date_var (str): The name of the column containing date information (default 'date').
-        plot_type (str): Type of plot to generate ('rolling' or 'heatmap').
-        window (int): Rolling window size in days (used if plot_type='rolling').
-        mode: 'count' (number of events), 'sum' (sum of a column) or 'mean' (average of a column)
-        num_var: Name of the column if mode 'sum' or 'mean' is used
-        csv_filename (str): File path to save the aggregated DataFrame as CSV.
-        png_filename (str): file path to save the plot images.
-        html_filename: file path to save the HTML render.
+        df (pd.DataFrame, optional): Input data as a DataFrame. Ignored if `endpoint_url` and `query` are provided.
+        endpoint_url (str, optional): SPARQL endpoint URL.
+        query (str, optional): SPARQL query to fetch data.
+        date_var (str): Name of the column containing date values (default: 'date').
+        plot_type (str): Type of plot to generate – either 'rolling' or 'heatmap'.
+        mode (str): Aggregation mode – 'count', 'sum', or 'mean'.
+        num_var (str, optional): Name of the numeric column for 'sum' or 'mean' mode.
+        window (int): Window size in days for rolling aggregation.
+        csv_filename (str): File path to save the aggregated data (CSV).
+        png_filename (str): File path to save the plot (PNG).
+        html_filename (str): File path to save the Plotly plot (HTML).
+
     Returns:
         None
     """
