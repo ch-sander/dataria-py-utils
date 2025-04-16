@@ -19,4 +19,5 @@ html_theme = 'alabaster'
 
 source_suffix = {
     '.md': 'markdown',
+    '.rst': 'restructuredtext',
 }
