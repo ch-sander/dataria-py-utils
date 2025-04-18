@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.abspath('../dataria'))
 extensions = [
     'myst_parser',
     'autoapi.extension',
+    'sphinx.ext.napoleon'
 ]
 
 autoapi_type = 'python'
