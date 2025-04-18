@@ -10,7 +10,7 @@ from .DATA import sparql_to_dataframe
 def correlation(df=None,
     endpoint_url=None,
     query=None,
-    col1=None, col2=None, sep=',', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True):
+    col1=None, col2=None, sep=',', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True, verbose=True):
     """
     Compute correlations between two columns of a DataFrame, including support for categorical (string) data.
 
@@ -43,6 +43,9 @@ def correlation(df=None,
     # Validate that columns exist in the DataFrame
     if col1 not in df.columns or col2 not in df.columns:
         raise ValueError(f"One or both columns '{col1}' and '{col2}' do not exist in the DataFrame.")
+    
+    df = df.dropna(subset=[col1, col2]) # only rows with valid content
+
     if col1 == col2:
         # Case: Both columns are the same
         if pd.api.types.is_numeric_dtype(df[col1]):
@@ -90,6 +93,8 @@ def correlation(df=None,
         for col1_dummy in col1_dummies.columns:
             for col2_dummy in col2_dummies.columns:
                 try:
+                    if combined_df[col1_dummy].std() == 0 or combined_df[col2_dummy].std() == 0:
+                        continue
                     correlation, p_val = pearsonr(combined_df[col1_dummy], combined_df[col2_dummy])
                     correlations[f'{col1_dummy} vs {col2_dummy}'] = {'Correlation': correlation, 'P-Value': p_val}
                 except Exception as e:
@@ -99,7 +104,10 @@ def correlation(df=None,
         correlation_df = pd.DataFrame.from_dict(correlations, orient='index')
     
     correlation_df = correlation_df.sort_values(by='Correlation', ascending=False)
-    print(correlation_df.info())
+    if verbose:
+        print(correlation_df.info())
+        correlation_df.describe()
+
 
     # Truncate the DataFrame if edges > 0
     if edges > 0:
@@ -122,7 +130,7 @@ def correlation(df=None,
 
     return correlation_df
 
-def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation", figsize=(10, 8), **heatmap_kwargs):
+def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation Heatmap", figsize=(10, 8), **heatmap_kwargs):
     """
     Generate a heatmap plot from a correlation DataFrame.
 
@@ -192,7 +200,7 @@ def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=Tr
 
 def upset(
     df=None, endpoint_url=None, query=None, col_item="item", col_sets="set", sep=",", 
-    csv_filename="upset_data.csv", plot_upset=True, png_filename="upset_plot.png", **upset_kwargs
+    csv_filename="upset_data.csv", plot_upset=True, png_filename="upset_plot.png", verbose=True, **upset_kwargs
 ):
     """
     Generate an UpSet plot and/or a DataFrame suitable for upset.js from set membership data.
@@ -237,14 +245,16 @@ def upset(
             plt.savefig(png_filename, dpi=300)
 
         plt.show()
-        upset_data.info()
+        if verbose:
+            print(upset_data.info())
+            upset_data.describe()
         
     return df_final
 
 def fuzzy_compare(df1=None,df2=None,
     endpoint_url=None,
     query=None,
-    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv"):
+    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv", verbose= True):
     """
     Fuzzy string matching between two DataFrames (or SPARQL query results) based on a common element column.
 
@@ -340,7 +350,9 @@ def fuzzy_compare(df1=None,df2=None,
     
     matches_df = pd.DataFrame(matches)
     aggregated = pd.DataFrame()
-    print(matches_df.info())
+    if verbose:
+        print(matches_df.info())
+        matches_df.describe()
 
     if not match_all:
         matches_df = matches_df[matches_df['score'] >= threshold]
@@ -355,7 +367,9 @@ def fuzzy_compare(df1=None,df2=None,
             Min_Score=('score', 'min'),
             Max_Score=('score', 'max')
         ).reset_index()
-        print(aggregated.info())
+        if verbose:
+            print(aggregated.info())
+            aggregated.describe()
     else:
         aggregated = pd.DataFrame()
         print("aggregated dataframe is empty!")
