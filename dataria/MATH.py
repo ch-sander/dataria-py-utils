@@ -10,7 +10,7 @@ from .DATA import sparql_to_dataframe
 def correlation(df=None,
     endpoint_url=None,
     query=None,
-    col1=None, col2=None, sep=',', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True):
+    col1=None, col2=None, sep=',', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True, verbose=True):
     """
     Calculate correlations between two DataFrame columns.
     Handles both numerical and string columns. String columns are converted into dummy variables.
@@ -90,6 +90,8 @@ def correlation(df=None,
         for col1_dummy in col1_dummies.columns:
             for col2_dummy in col2_dummies.columns:
                 try:
+                    if combined_df[col1_dummy].std() == 0 or combined_df[col2_dummy].std() == 0:
+                        continue
                     correlation, p_val = pearsonr(combined_df[col1_dummy], combined_df[col2_dummy])
                     correlations[f'{col1_dummy} vs {col2_dummy}'] = {'Correlation': correlation, 'P-Value': p_val}
                 except Exception as e:
@@ -99,7 +101,10 @@ def correlation(df=None,
         correlation_df = pd.DataFrame.from_dict(correlations, orient='index')
     
     correlation_df = correlation_df.sort_values(by='Correlation', ascending=False)
-    print(correlation_df.info())
+    if verbose:
+        print(correlation_df.info())
+        correlation_df.describe()
+
 
     # Truncate the DataFrame if edges > 0
     if edges > 0:
@@ -184,7 +189,7 @@ def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=Tr
 
 def upset(
     df=None, endpoint_url=None, query=None, col_item="item", col_sets="set", sep=",", 
-    csv_filename="upset_data.csv", plot_upset=True, png_filename="upset_plot.png", **upset_kwargs
+    csv_filename="upset_data.csv", plot_upset=True, png_filename="upset_plot.png", verbose=True, **upset_kwargs
 ):
     """
     Converts a DataFrame with an item column and a delimited set column into a format suitable for upset.js.
@@ -225,14 +230,16 @@ def upset(
             plt.savefig(png_filename, dpi=300)
 
         plt.show()
-        upset_data.info()
+        if verbose:
+            print(upset_data.info())
+            upset_data.describe()
         
     return df_final
 
 def fuzzy_compare(df1=None,df2=None,
     endpoint_url=None,
     query=None,
-    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv"):
+    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv", verbose= True):
     """
     Args:
         df1 (pd.DataFrame): The input DataFrame containing the data.
@@ -323,7 +330,9 @@ def fuzzy_compare(df1=None,df2=None,
     
     matches_df = pd.DataFrame(matches)
     aggregated = pd.DataFrame()
-    print(matches_df.info())
+    if verbose:
+        print(matches_df.info())
+        matches_df.describe()
 
     if not match_all:
         matches_df = matches_df[matches_df['score'] >= threshold]
@@ -338,7 +347,9 @@ def fuzzy_compare(df1=None,df2=None,
             Min_Score=('score', 'min'),
             Max_Score=('score', 'max')
         ).reset_index()
-        print(aggregated.info())
+        if verbose:
+            print(aggregated.info())
+            aggregated.describe()
     else:
         aggregated = pd.DataFrame()
         print("aggregated dataframe is empty!")
