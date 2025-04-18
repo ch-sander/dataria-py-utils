@@ -43,6 +43,9 @@ def correlation(df=None,
     # Validate that columns exist in the DataFrame
     if col1 not in df.columns or col2 not in df.columns:
         raise ValueError(f"One or both columns '{col1}' and '{col2}' do not exist in the DataFrame.")
+    
+    df = df.dropna(subset=[col1, col2]) # only rows with valid content
+
     if col1 == col2:
         # Case: Both columns are the same
         if pd.api.types.is_numeric_dtype(df[col1]):
@@ -127,7 +130,7 @@ def correlation(df=None,
 
     return correlation_df
 
-def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation", figsize=(10, 8), **heatmap_kwargs):
+def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=True, title="Correlation Heatmap", figsize=(10, 8), **heatmap_kwargs):
     """
     Create a heatmap plot for correlation values.
 
