@@ -27,6 +27,7 @@ def correlation(df=None,
         heatmap (bool, optional): If True, plots a heatmap of correlations. Default is True.
         heatmap_kwargs (dict, optional): Additional arguments for the heatmap plot.
         save_PNG (bool, optional): If True, saves the correlation heatmap as a PNG file. Default is True.
+        verbose (bool, optional): If True, prints dataframe insights.
 
     Returns:
         pd.DataFrame: A DataFrame with correlation and p-value for each dummy variable if needed.
@@ -207,6 +208,7 @@ def upset(
         csv_filename (str): Filename for saving the CSV file.
         plot_upset (bool): If True, generates an UpSet plot.
         png_filename (str): Filename for saving the PNG file.
+        verbose (bool, optional): If True, prints dataframe insights.
         **upset_kwargs: Additional keyword arguments passed to up.UpSet()
     Returns:
         pd.DataFrame: Transformed DataFrame suitable for upset.js.
@@ -256,6 +258,7 @@ def fuzzy_compare(df1=None,df2=None,
         match_all (bool, optional): If True, only return grouped results for a full match accross all elements.
         unique_rows (bool, optional): If True, only return one row per hit.
         csv_filename (str, optional): The filename for saving the CSV file. Default is "comparison.csv".
+        verbose (bool, optional): If True, prints dataframe insights.
 
     Returns:
         pd.DataFrame: A DataFrame with each element compared against all other elements.
