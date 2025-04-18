@@ -28,6 +28,7 @@ def correlation(df=None,
         heatmap (bool, optional): Whether to generate a heatmap. Default is True.
         heatmap_kwargs (dict, optional): Additional kwargs passed to the heatmap function.
         save_PNG (bool, optional): Whether to save the heatmap as a PNG file.
+        verbose (bool, optional): Whether to print insights into the dataframe.
 
     Returns:
         pd.DataFrame: A DataFrame containing correlation values and p-values.
@@ -93,8 +94,6 @@ def correlation(df=None,
         for col1_dummy in col1_dummies.columns:
             for col2_dummy in col2_dummies.columns:
                 try:
-                    if combined_df[col1_dummy].std() == 0 or combined_df[col2_dummy].std() == 0:
-                        continue
                     correlation, p_val = pearsonr(combined_df[col1_dummy], combined_df[col2_dummy])
                     correlations[f'{col1_dummy} vs {col2_dummy}'] = {'Correlation': correlation, 'P-Value': p_val}
                 except Exception as e:
@@ -217,6 +216,7 @@ def upset(
         csv_filename (str): File path to save the transformed DataFrame.
         plot_upset (bool): Whether to generate an UpSet plot.
         png_filename (str): File path to save the UpSet plot as PNG.
+        verbose (bool, optional): Whether to print insights into the dataframe.
         **upset_kwargs: Additional arguments for `up.UpSet()`.
 
     Returns:
@@ -272,6 +272,7 @@ def fuzzy_compare(df1=None,df2=None,
         match_all (bool): If True, only include groups where all scores exceed the threshold.
         unique_rows (bool): If True, suppress duplicate pairings.
         csv_filename (str): File path to save the results.
+        verbose (bool, optional): Whether to print insights into the dataframe.
 
     Returns:
         pd.DataFrame: Aggregated match statistics between df1 and df2 (or within df1).
