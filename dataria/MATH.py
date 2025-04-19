@@ -10,7 +10,7 @@ from .DATA import sparql_to_dataframe
 def correlation(df=None,
     endpoint_url=None,
     query=None,
-    col1=None, col2=None, sep=',', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True, verbose=True):
+    col1=None, col2=None, sep=';', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True, verbose=True):
     """
     Compute correlations between two columns of a DataFrame, including support for categorical (string) data.
 
@@ -198,7 +198,7 @@ def plot_correlation_heatmap(correlation_df, corr_col='Correlation', save_PNG=Tr
     plt.show()
 
 def upset(
-    df=None, endpoint_url=None, query=None, col_item="item", col_sets="set", sep=",", 
+    df=None, endpoint_url=None, query=None, col_item="item", col_sets="set", sep=";", 
     csv_filename="upset_data.csv", plot_upset=True, png_filename="upset_plot.png", verbose=True, **upset_kwargs
 ):
     """
