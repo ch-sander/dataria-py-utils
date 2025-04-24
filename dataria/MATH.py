@@ -74,14 +74,18 @@ def correlation(df=None,
 
         # Case 2: One or both columns are strings -> Create dummy variables
         if pd.api.types.is_string_dtype(df[col1]):
-            col1_dummies = df[col1].str.get_dummies(sep=sep)
+            col1_dummies = df[col1].astype(str).str.get_dummies(sep=sep).add_prefix(f"{col1}__")
         else:
-            col1_dummies = df[[col1]]
+            col1_dummies = df[[col1]].astype(float).add_prefix(f"{col1}__")
 
         if pd.api.types.is_string_dtype(df[col2]):
-            col2_dummies = df[col2].str.get_dummies(sep=sep)
+            col2_dummies = df[col2].astype(str).str.get_dummies(sep=sep).add_prefix(f"{col2}__")
         else:
-            col2_dummies = df[[col2]]
+            col2_dummies = df[[col2]].astype(float).add_prefix(f"{col2}__")
+
+        # Align indexes
+        col1_dummies = col1_dummies.reset_index(drop=True)
+        col2_dummies = col2_dummies.reset_index(drop=True)
 
         # Combine dummies with the original DataFrame
         df = df.drop(columns=[col1, col2])
