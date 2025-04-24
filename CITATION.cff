@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it using the metadata from this file.
+title:  >-
+  DATAria Python Utils
+abstract: Dataria Python Package
+type: software
+license: MIT
+url: https://github.com/ch-sander/dataria-py-utils
+authors: 
+  - family-names: Sander
+    given-names: Christoph
+date-released: 2025-04-23

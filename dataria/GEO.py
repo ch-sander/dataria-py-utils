@@ -1,3 +1,13 @@
+"""
+SPARQL-based geospatial data processing and interactive mapping.
+
+This module provides functions to:
+- Convert SPARQL query results into GeoDataFrames,
+- Serialize them as GeoJSON,
+- Generate interactive maps using GeoPandas' `.explore()` (via folium).
+"""
+
+
 from SPARQLWrapper import SPARQLWrapper, JSON
 import json
 import geopandas as gpd
@@ -8,15 +18,21 @@ from .DATA import sparql_to_dataframe
 
 def dataframe_to_geodataframe(df, geo_var, json_filename="result_explore.geojson"):
     """
-    Convert a Pandas DataFrame into a GeoPandas GeoDataFrame using a specified geometry column.
-    The geometry column is removed from the DataFrame columns and set as the geometry in the GeoDataFrame.
+    Convert a Pandas DataFrame into a GeoPandas GeoDataFrame using a geometry column.
+
+    This function extracts a geometry column from the input DataFrame, converts it into a spatial
+    GeoDataFrame, and optionally saves the result as a GeoJSON file.
 
     Args:
-        df (pd.DataFrame): The input Pandas DataFrame.
-        geo_var (str): The column name to use as geometry.
+        df (pd.DataFrame): Input DataFrame containing geometry data.
+        geo_var (str): Name of the column with Shapely geometry objects.
+        json_filename (str, optional): Path to save the resulting GeoJSON file.
 
     Returns:
-        gpd.GeoDataFrame: A GeoDataFrame with a defined geometry column.
+        gpd.GeoDataFrame: A spatially enabled GeoDataFrame with WGS84 coordinates.
+
+    Raises:
+        ValueError: If the geometry column is missing or empty.
     """
     # Validate that the geometry column exists
     if geo_var not in df.columns:
@@ -48,39 +64,29 @@ def explore(df=None,
             html_filename="result_map.html",
             **explore_kwargs):
     """
-    Executes a SPARQL query against a specified endpoint, transforms the results into a GeoDataFrame,
-    converts them to GeoJSON, and displays them using folium (via gdf.explore).
+    Generate an interactive map from SPARQL query results or GeoDataFrames.
+
+    This function fetches data via SPARQL (if needed), transforms it into a GeoDataFrame,
+    and visualizes the result as an interactive Leaflet map using GeoPandas’ `.explore()` method.
+    Results can be exported as CSV, GeoJSON, and HTML files.
 
     Args:
-        df : DataFrame
-            An existent DataFrame. If absent, endpoint_url and query must be given. 
-        gdf : GeoDataFrame
-            An existent GeoDataFrame. If absent, df or endpoint_url and query must be defined
-        endpoint_url : str
-            The SPARQL endpoint URL to query. Ignored if df or gdf are defined.
-        query : str
-            The SPARQL query to be executed. Ignored if df or gdf are defined.
-        geo_var : str, optional
-            The variable name in the SPARQL query that contains geometry data. Default is 'geom'.
-        cluster_weight_var : str, optional
-            The variable name containing clustering or weighting values to customize map visualization.
-            If None or not present, this column will be ignored. Default is 'cluster'.
-        csv_filename : bool, optional
-            Saves the resulting dataframe as an CSV file.
-        json_filename : str, optional
-            Saves the GeoDataFrame as a GeoJSON file.
-        html_filename : str, optional
-            Saves the resulting map as an HTML file.
-        **explore_kwargs:
-            Additional keyword arguments passed to gdf.explore() for customizing the map.
+        df (pd.DataFrame, optional): Input DataFrame. Ignored if `gdf` is provided.
+        gdf (gpd.GeoDataFrame, optional): Input GeoDataFrame. Takes precedence over `df`.
+        endpoint_url (str, optional): SPARQL endpoint to query.
+        query (str, optional): SPARQL query string.
+        geo_var (str): Column name containing geometry data (default: 'geom').
+        cluster_weight_var (str): Optional column used to color the map.
+        csv_filename (str): Optional file path to export query results as CSV.
+        json_filename (str): Optional file path to save the data as GeoJSON.
+        html_filename (str): Optional file path to save the interactive map as HTML.
+        **explore_kwargs: Additional keyword arguments for `GeoDataFrame.explore()`.
 
     Returns:
-        folium.Map
-            The generated folium map with the SPARQL query results.
+        folium.Map: An interactive map object rendered with folium.
 
     Raises:
-        ValueError
-            If the SPARQL query results cannot be transformed into a valid DataFrame or GeoDataFrame.
+        ValueError: If required inputs are missing or data transformation fails.
     """
     if gdf is None and df is None and (endpoint_url is None or query is None):
         raise ValueError("Either `gdf`, `df`, or both `endpoint_url` and `query` must be provided.")
