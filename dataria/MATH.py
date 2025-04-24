@@ -67,21 +67,21 @@ def correlation(df=None,
             correlation_df = correlation_df[correlation_df['Var_1'] < correlation_df['Var_2']]
             
     else:
-        # Case 1: Both columns are numeric
-        if pd.api.types.is_numeric_dtype(df[col1]) and pd.api.types.is_numeric_dtype(df[col2]):
-            correlation, p_val = pearsonr(df[col1], df[col2])
-            return pd.DataFrame({'Correlation': [correlation], 'P-Value': [p_val]}, index=[f'{col1} vs {col2}'])
+        # Case: Both columns are different
 
-        # Case 2: One or both columns are strings -> Create dummy variables
         if pd.api.types.is_string_dtype(df[col1]):
-            col1_dummies = df[col1].astype(str).str.get_dummies(sep=sep).add_prefix(f"{col1}__")
+            col1_dummies_raw = df[col1].astype(str).str.get_dummies(sep=sep)
         else:
-            col1_dummies = df[[col1]].astype(float).add_prefix(f"{col1}__")
+            col1_dummies_raw = df[[col1]].astype(float)
 
         if pd.api.types.is_string_dtype(df[col2]):
-            col2_dummies = df[col2].astype(str).str.get_dummies(sep=sep).add_prefix(f"{col2}__")
+            col2_dummies_raw = df[col2].astype(str).str.get_dummies(sep=sep)
         else:
-            col2_dummies = df[[col2]].astype(float).add_prefix(f"{col2}__")
+            col2_dummies_raw = df[[col2]].astype(float)
+
+        shared_columns = set(col1_dummies_raw.columns) & set(col2_dummies_raw.columns)
+        col1_dummies = col1_dummies_raw.add_prefix(f"{col1}__") if shared_columns else col1_dummies_raw
+        col2_dummies = col2_dummies_raw.add_prefix(f"{col2}__") if shared_columns else col2_dummies_raw
 
         # Align indexes
         col1_dummies = col1_dummies.reset_index(drop=True)
