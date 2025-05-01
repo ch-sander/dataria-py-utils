@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import upsetplot as up
-from fuzzywuzzy import fuzz
+from rapidfuzz import fuzz
 from .DATA import sparql_to_dataframe
 
 def correlation(df=None,

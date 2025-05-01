@@ -21,7 +21,7 @@ dependencies = [
     "seaborn",
     "pandas",
     "upsetplot",
-    "fuzzywuzzy"
+    "rapidfuzz"
 ]
 
 [tool.setuptools.packages.find]
