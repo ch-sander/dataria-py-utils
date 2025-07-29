@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import upsetplot as up
 from rapidfuzz import fuzz
-from .DATA import sparql_to_dataframe
+from .DATA import sparql_to_dataframe, get_token_matrix
 
 def correlation(df=None,
     endpoint_url=None,
     query=None,
-    col1=None, col2=None, sep=';', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True, verbose=True):
+    col1=None, col2=None, sep=';', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, dummies_matrix=True, save_PNG=True, verbose=True):
     """
     Compute correlations between two columns of a DataFrame, including support for categorical (string) data.
 
@@ -27,6 +27,7 @@ def correlation(df=None,
         csv_filename (str, optional): File path to save the result as CSV.
         heatmap (bool, optional): Whether to generate a heatmap. Default is True.
         heatmap_kwargs (dict, optional): Additional kwargs passed to the heatmap function.
+        dummies_matrix (bool, optional): Treat col1 and col2 as binary dummies. Default is True, else bag of words, count frequency.
         save_PNG (bool, optional): Whether to save the heatmap as a PNG file.
         verbose (bool, optional): Whether to print insights into the dataframe.
 
@@ -55,8 +56,9 @@ def correlation(df=None,
             return pd.DataFrame({'Correlation': [correlation], 'P-Value': [p_val]}, index=[f'{col1} vs {col2}'])
         elif pd.api.types.is_string_dtype(df[col1]):
             # Both are string, create dummy variables once
-            dummies = df[col1].str.get_dummies(sep=sep)
-            
+            dummies = get_token_matrix(df[col1],sep,dummies_matrix)
+            # dummies = df[col1].str.get_dummies(sep=sep)
+  
             if dummies.shape[1] < 2:
                 raise ValueError(f"Not enough dummy variables in '{col1}' to calculate correlations.")
             
@@ -70,12 +72,12 @@ def correlation(df=None,
         # Case: Both columns are different
 
         if pd.api.types.is_string_dtype(df[col1]):
-            col1_dummies_raw = df[col1].astype(str).str.get_dummies(sep=sep)
+            col1_dummies_raw = get_token_matrix(df[col1],sep,dummies_matrix) # df[col1].astype(str).str.get_dummies(sep=sep)
         else:
             col1_dummies_raw = df[[col1]].astype(float)
 
         if pd.api.types.is_string_dtype(df[col2]):
-            col2_dummies_raw = df[col2].astype(str).str.get_dummies(sep=sep)
+            col2_dummies_raw = get_token_matrix(df[col2],sep,dummies_matrix) # df[col2].astype(str).str.get_dummies(sep=sep)
         else:
             col2_dummies_raw = df[[col2]].astype(float)
 
