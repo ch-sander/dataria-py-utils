@@ -292,19 +292,13 @@ def fuzzy_compare(df1=None,df2=None,
     if df1 is None and endpoint_url and query:
         try:
             # Fetch data and create DataFrame
-            df1 = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query1_{csv_filename}" if csv_filename is not None else None)
-        except Exception as e:
-            raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
-
-    if df2 is None and endpoint_url and query:
-        try:
-            # Fetch data and create DataFrame
-            df2 = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query2_{csv_filename}" if csv_filename is not None else None)
+            df1 = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query_{csv_filename}" if csv_filename is not None else None)
         except Exception as e:
             raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
 
     if df2 is None:
         df2 = df1
+
 
     if additional_vars_df1 is None:
         additional_vars_df1 = []
