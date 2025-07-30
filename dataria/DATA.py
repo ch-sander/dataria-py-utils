@@ -154,3 +154,28 @@ def parse_xsd_date_or_datetime(iso_string, dtype, unix_year=1950):
     except Exception as e:
         print(f"Error parsing '{dtype}' with value '{iso_string}': {e}")
         return pd.NaT  # Fallback to the original string
+
+def get_token_matrix(series, sep=" ", dummies=True):
+    """
+    Generate a token matrix (either binary or count-based) from a Pandas Series.
+
+    Args:
+        series (pd.Series): The input column containing string data.
+        sep (str): Separator used to split tokens.
+        dummies (bool): If True, return binary (0/1) presence; if False, return token counts.
+
+    Returns:
+        pd.DataFrame: A DataFrame with one column per token and one row per entry.
+    """
+    series = series.fillna("").astype(str)
+    
+    if dummies:
+        return series.str.get_dummies(sep=sep)
+    else:
+        return (
+            series
+            .str.split(sep)
+            .apply(lambda tokens: pd.Series(tokens).value_counts())
+            .fillna(0)
+            .astype(int)
+        )

@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import upsetplot as up
 from rapidfuzz import fuzz
-from .DATA import sparql_to_dataframe
+from .DATA import sparql_to_dataframe, get_token_matrix
 
 def correlation(df=None,
     endpoint_url=None,
     query=None,
-    col1=None, col2=None, sep=';', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, save_PNG=True, verbose=True):
+    col1=None, col2=None, sep=';', edges=0, csv_filename="correlations.csv", heatmap=True, heatmap_kwargs={}, dummies_matrix=True, save_PNG=True, verbose=True):
     """
     Compute correlations between two columns of a DataFrame, including support for categorical (string) data.
 
@@ -27,6 +27,7 @@ def correlation(df=None,
         csv_filename (str, optional): File path to save the result as CSV.
         heatmap (bool, optional): Whether to generate a heatmap. Default is True.
         heatmap_kwargs (dict, optional): Additional kwargs passed to the heatmap function.
+        dummies_matrix (bool, optional): Treat col1 and col2 as binary dummies. Default is True, else bag of words, count frequency.
         save_PNG (bool, optional): Whether to save the heatmap as a PNG file.
         verbose (bool, optional): Whether to print insights into the dataframe.
 
@@ -55,8 +56,9 @@ def correlation(df=None,
             return pd.DataFrame({'Correlation': [correlation], 'P-Value': [p_val]}, index=[f'{col1} vs {col2}'])
         elif pd.api.types.is_string_dtype(df[col1]):
             # Both are string, create dummy variables once
-            dummies = df[col1].str.get_dummies(sep=sep)
-            
+            dummies = get_token_matrix(df[col1],sep,dummies_matrix)
+            # dummies = df[col1].str.get_dummies(sep=sep)
+  
             if dummies.shape[1] < 2:
                 raise ValueError(f"Not enough dummy variables in '{col1}' to calculate correlations.")
             
@@ -70,12 +72,12 @@ def correlation(df=None,
         # Case: Both columns are different
 
         if pd.api.types.is_string_dtype(df[col1]):
-            col1_dummies_raw = df[col1].astype(str).str.get_dummies(sep=sep)
+            col1_dummies_raw = get_token_matrix(df[col1],sep,dummies_matrix) # df[col1].astype(str).str.get_dummies(sep=sep)
         else:
             col1_dummies_raw = df[[col1]].astype(float)
 
         if pd.api.types.is_string_dtype(df[col2]):
-            col2_dummies_raw = df[col2].astype(str).str.get_dummies(sep=sep)
+            col2_dummies_raw = get_token_matrix(df[col2],sep,dummies_matrix) # df[col2].astype(str).str.get_dummies(sep=sep)
         else:
             col2_dummies_raw = df[[col2]].astype(float)
 
@@ -256,9 +258,10 @@ def upset(
     return df_final
 
 def fuzzy_compare(df1=None,df2=None,
-    endpoint_url=None,
-    query=None,
-    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv", verbose= True):
+                    additional_vars_df1=None, additional_vars_df2=None,
+                    endpoint_url=None,
+                    query=None,
+                    grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv", verbose= True):
     """
     Fuzzy string matching between two DataFrames (or SPARQL query results) based on a common element column.
 
@@ -267,6 +270,8 @@ def fuzzy_compare(df1=None,df2=None,
     Args:
         df1 (pd.DataFrame, optional): First DataFrame.
         df2 (pd.DataFrame, optional): Second DataFrame. If not provided, df1 is used.
+        additional_vars_df1 (list, optional): List of columns that will be aggregated in the result (using first per group).
+        additional_vars_df2 (list, optional): List of columns that will be aggregated in the result (using first per group).
         endpoint_url (str, optional): SPARQL endpoint.
         query (str, optional): SPARQL query.
         grouping_var (str, optional): Column name used for grouping.
@@ -283,22 +288,27 @@ def fuzzy_compare(df1=None,df2=None,
     """
 
 
+
     if df1 is None and endpoint_url and query:
         try:
             # Fetch data and create DataFrame
-            df1 = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query1_{csv_filename}" if csv_filename is not None else None)
-        except Exception as e:
-            raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
-
-    if df2 is None and endpoint_url and query:
-        try:
-            # Fetch data and create DataFrame
-            df2 = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query2_{csv_filename}" if csv_filename is not None else None)
+            df1 = sparql_to_dataframe(endpoint_url, query, csv_filename=f"query_{csv_filename}" if csv_filename is not None else None)
         except Exception as e:
             raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
 
     if df2 is None:
         df2 = df1
+
+
+    if additional_vars_df1 is None:
+        additional_vars_df1 = []
+    else:
+        additional_vars_df1 = [col for col in additional_vars_df1 if col in df1.columns]
+
+    if additional_vars_df2 is None:
+        additional_vars_df2 = []
+    else:
+        additional_vars_df2 = [col for col in additional_vars_df2 if col in df2.columns]
 
     # Validate that columns exist in the DataFrame
     if element_var not in df1.columns or element_var not in df2.columns:
@@ -344,14 +354,22 @@ def fuzzy_compare(df1=None,df2=None,
                     else:
                         score = fuzz.ratio(row2[element_var].lower(), row1[element_var].lower())
 
-                    matches.append({
+                    match_entry = {
                         'group2': group_key2,
                         'group1': group_key1,
                         'label': row2[label_var] if check_label else None,
                         'element2': row2[element_var],
                         'element1': row1[element_var],
                         'score': score
-                    })
+                    }
+
+                    for col in additional_vars_df1:                        
+                            match_entry[f'df1_{col}'] = row1[col]
+
+                    for col in additional_vars_df2:                        
+                            match_entry[f'df2_{col}'] = row2[col]
+
+                    matches.append(match_entry)
     
     matches_df = pd.DataFrame(matches)
     aggregated = pd.DataFrame()
@@ -363,15 +381,23 @@ def fuzzy_compare(df1=None,df2=None,
         matches_df = matches_df[matches_df['score'] >= threshold]
 
     if not matches_df.empty:
-        aggregated = matches_df.groupby(['group1', 'group2']).agg(
-            Labels=('label', lambda x: ", ".join(sorted(set(x)))),
-            df1_Elements=('element1', lambda x: ", ".join(sorted(set(x)))),
-            df2_Elements=('element2', lambda x: ", ".join(sorted(set(x)))),
-            Num_Matches=('score', 'count'),
-            Average_Score=('score', 'mean'),
-            Min_Score=('score', 'min'),
-            Max_Score=('score', 'max')
-        ).reset_index()
+        agg_dict = {
+            'Labels': ('label', lambda x: ", ".join(sorted(set(x)))),
+            'df1_Elements': ('element1', lambda x: ", ".join(sorted(set(x)))),
+            'df2_Elements': ('element2', lambda x: ", ".join(sorted(set(x)))),
+            'Num_Matches': ('score', 'count'),
+            'Average_Score': ('score', 'mean'),
+            'Min_Score': ('score', 'min'),
+            'Max_Score': ('score', 'max')
+        }
+
+        for col in additional_vars_df1:
+            agg_dict[f'df1_{col}'] = (f'df1_{col}', 'first')
+        for col in additional_vars_df2:
+            agg_dict[f'df2_{col}'] = (f'df2_{col}', 'first')
+
+        aggregated = matches_df.groupby(['group1', 'group2']).agg(**agg_dict).reset_index()
+
         if verbose:
             print(aggregated.info())
             aggregated.describe()
