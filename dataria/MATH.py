@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import upsetplot as up
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process
 from .DATA import sparql_to_dataframe, get_token_matrix
 
 def correlation(df=None,
@@ -257,12 +257,255 @@ def upset(
         
     return df_final
 
-def fuzzy_compare(df1=None,df2=None,
+
+
+def fuzzy_compare(df1=None, df2=None,
+                  additional_vars_df1=None, additional_vars_df2=None,
+                  endpoint_url=None, query=None,
+                  grouping_var=None, label_var=None, element_var=None,
+                  threshold=95, match_all=False, unique_rows=False,
+                  csv_filename="comparison.csv", verbose=True):
+    """
+    Fuzzy string matching between two DataFrames (or SPARQL query results) based on a common element column.
+
+    Supports optional grouping, label filtering, and aggregation of match statistics.
+
+    Args:
+        df1 (pd.DataFrame, optional): First DataFrame.
+        df2 (pd.DataFrame, optional): Second DataFrame. If not provided, df1 is used.
+        additional_vars_df1 (list, optional): List of columns from df1 that will be aggregated in the result.
+        additional_vars_df2 (list, optional): List of columns from df2 that will be aggregated in the result.
+        endpoint_url (str, optional): SPARQL endpoint (used if df1 is None).
+        query (str, optional): SPARQL query (used if df1 is None).
+        grouping_var (str, optional): Column name used for grouping (must exist in both DataFrames).
+        label_var (str or list, optional): Label conditions, one of:
+            - str or (col, "identical") or (col, 100): require exact match on this column
+            - (col, int < 100): require fuzzy match on this column with given threshold
+        element_var (str): Column containing the string values to compare with fuzzy matching.
+        threshold (int, optional): Fuzzy matching threshold for element_var (0–100). Default: 95.
+        match_all (bool, optional): If True, only include groups where all matches exceed the threshold.
+        unique_rows (bool, optional): If True, suppress duplicate pairings (self-joins).
+        csv_filename (str, optional): File path to save the aggregated results. If None, skip saving.
+        verbose (bool, optional): If True, print debug info and head of results.
+
+    Returns:
+        pd.DataFrame: Aggregated match statistics between df1 and df2 (or within df1).
+
+    """
+
+    # Load from SPARQL if needed
+    if df1 is None and endpoint_url and query:
+        try:
+            df1 = sparql_to_dataframe(
+                endpoint_url, query,
+                csv_filename=f"query_{csv_filename}" if csv_filename else None
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to fetch or process SPARQL query results. Error: {e}")
+
+    if df2 is None:
+        df2 = df1
+
+    # detect self-join (common when df2 is None)
+    self_join = (df1 is df2)
+
+    additional_vars_df1 = [c for c in (additional_vars_df1 or []) if c in df1.columns]
+    additional_vars_df2 = [c for c in (additional_vars_df2 or []) if c in df2.columns] if not self_join else additional_vars_df1
+
+    if element_var not in df1.columns or element_var not in df2.columns:
+        raise ValueError(f"Column '{element_var}' not found in DataFrames.")
+
+    # Normalize label vars
+    plain_labels, identical_vars, fuzzy_vars = [], [], {}
+    if label_var:
+        if isinstance(label_var, str):
+            # treat string the same as identical condition
+            identical_vars.append(label_var)
+        elif isinstance(label_var, list):
+            for lv in label_var:
+                if isinstance(lv, tuple) and len(lv) == 2:
+                    col, cond = lv
+                    if cond == "identical" or cond == 100:
+                        identical_vars.append(col)
+                    elif isinstance(cond, int) and 0 <= cond < 100:
+                        fuzzy_vars[col] = cond
+                    else:
+                        raise ValueError(f"Unsupported label_var condition: {lv}")
+                elif isinstance(lv, str):
+                    identical_vars.append(lv)
+                else:
+                    plain_labels.append(lv)
+
+    # IDENTICAL FILTER
+    matches = []
+    if identical_vars:
+        # preserve original row indices for both sides
+        left = df1.reset_index().rename(columns={"index": "_i"})
+        right = df2.reset_index().rename(columns={"index": "_j"})
+        merged = pd.merge(left, right, on=identical_vars, suffixes=("_df1", "_df2"))
+        if not merged.empty:
+            arr1 = merged[f"{element_var}_df1"].astype(str).str.lower().to_numpy()
+            arr2 = merged[f"{element_var}_df2"].astype(str).str.lower().to_numpy()
+            idx_i = merged["_i"].to_numpy()
+            idx_j = merged["_j"].to_numpy()
+
+            if threshold >= 100:
+                # equality-only check
+                eq = (arr1 == arr2)
+                if self_join:
+                    eq = eq & (idx_i != idx_j)  # drop diagonal
+                for i_in_merged in np.where(eq)[0]:
+                    gi = idx_i[i_in_merged]
+                    gj = idx_j[i_in_merged]
+                    if self_join and unique_rows and gj < gi:
+                        continue
+                    matches.append((gi, gj, 100))
+            else:
+                for k, (s1, s2) in enumerate(zip(arr1, arr2)):
+                    gi = idx_i[k]; gj = idx_j[k]
+                    if self_join and gi == gj:
+                        continue
+                    score = fuzz.ratio(s1, s2)
+                    if score >= threshold:
+                        if not (self_join and unique_rows and gj < gi):
+                            matches.append((gi, gj, score))
+    else:
+        # GLOBAL MATCHING via cdist (batch, cutoff)
+        arr1 = df1[element_var].astype(str).str.lower().to_numpy()
+        arr2 = df2[element_var].astype(str).str.lower().to_numpy()
+
+        if threshold >= 100:
+            equal_mask = (arr1[:, None] == arr2[None, :])
+            if self_join:
+                np.fill_diagonal(equal_mask, False)
+            i_idx, j_idx = np.where(equal_mask)
+            for gi, gj in zip(i_idx, j_idx):
+                if self_join and unique_rows and gj < gi:
+                    continue
+                matches.append((gi, gj, 100))
+        else:
+            batch_size = 2000
+            for start in range(0, len(arr1), batch_size):
+                sub1 = arr1[start:start+batch_size]
+                scores = process.cdist(
+                    sub1, arr2,
+                    scorer=fuzz.ratio,
+                    workers=-1,
+                    score_cutoff=threshold
+                )
+                if hasattr(scores, "ndim"):
+                    for i, row in enumerate(scores):
+                        gi = start + i
+                        if self_join:
+                            # indices with score >= threshold
+                            js = np.nonzero(row)[0]
+                            for gj in js:
+                                if gj == gi:
+                                    continue
+                                if unique_rows and gj < gi:
+                                    continue
+                                matches.append((gi, gj, float(row[gj])))
+                        else:
+                            js = np.nonzero(row)[0]
+                            for gj in js:
+                                matches.append((gi, gj, float(row[gj])))
+                else:
+                    for i, row_dict in enumerate(scores):
+                        gi = start + i
+                        for gj, sc in row_dict.items():
+                            if self_join:
+                                if gj == gi:
+                                    continue
+                                if unique_rows and gj < gi:
+                                    continue
+                            matches.append((gi, gj, float(sc)))
+
+    if not matches:
+        if verbose: print("No matches found (after self-join filtering and threshold).")
+        return pd.DataFrame()
+
+    # Build matches_df
+    matches_df = pd.DataFrame(matches, columns=["i", "j", "score"])
+    df1_reset = df1.reset_index(drop=True).add_suffix("_df1")
+    df2_reset = df2.reset_index(drop=True).add_suffix("_df2")
+
+    matches_df = matches_df.join(df1_reset, on="i")
+    matches_df = matches_df.join(df2_reset, on="j")
+
+    # Fuzzy-label filter (post-match)
+    if fuzzy_vars:
+        ok_mask = np.ones(len(matches_df), dtype=bool)
+        for col, th in fuzzy_vars.items():
+            s1 = matches_df[col].fillna("").astype(str).str.lower().to_numpy()
+            s2 = matches_df[f"{col}_df2"].fillna("").astype(str).str.lower().to_numpy()
+            sim = np.fromiter((fuzz.ratio(a, b) for a, b in zip(s1, s2)), dtype=float, count=len(s1))
+            ok_mask &= (sim >= th)
+        matches_df = matches_df[ok_mask]
+
+    if matches_df.empty:
+        if verbose: print("No matches after fuzzy-label filter.")
+        return pd.DataFrame()
+
+    # Grouping AFTER matching
+    if grouping_var and grouping_var in df1.columns and grouping_var in df2.columns:
+        matches_df["group1"] = matches_df[f"{grouping_var}_df1"]
+        matches_df["group2"] = matches_df[f"{grouping_var}_df2"]
+    else:
+        matches_df["group1"] = "all"
+        matches_df["group2"] = "all"
+
+    # Aggregation
+    agg_dict = {
+        'df1_Elements': (f"{element_var}_df1", lambda x: ", ".join(sorted(set(map(str, x))))),
+        'df2_Elements': (f"{element_var}_df2", lambda x: ", ".join(sorted(set(map(str, x))))),
+        'Num_Matches': ('score', 'count'),
+        'Average_Score': ('score', 'mean'),
+        'Min_Score': ('score', 'min'),
+        'Max_Score': ('score', 'max'),
+    }
+
+    # for col in plain_labels + identical_vars + list(fuzzy_vars.keys()):
+    #     agg_dict[col] = (f"{col}_df1", lambda x: ", ".join(sorted(set(map(str, x.dropna())))))
+
+    for col in additional_vars_df1:
+        agg_dict[f'df1_{col}'] = (f"{col}_df1", 'first')
+    for col in additional_vars_df2:
+        agg_dict[f'df2_{col}'] = (f"{col}_df2", 'first')
+
+    aggregated = matches_df.groupby(['group1', 'group2']).agg(**agg_dict).reset_index()
+
+    # unique_rows at group level (optional, for asymmetric string groups)
+    if unique_rows and grouping_var:
+        aggregated = aggregated[aggregated['group1'] <= aggregated['group2']]
+
+    # match_all semantics
+    if match_all:
+        aggregated = aggregated[aggregated['Min_Score'] >= threshold]
+
+    # Always enforce threshold via Max_Score
+    aggregated = aggregated[aggregated['Max_Score'] >= threshold]
+
+    # Save & Verbose
+    if csv_filename:
+        try:
+            aggregated.to_csv(csv_filename, index=False)
+        except Exception as e:
+            print(f"Failed to save CSV file '{csv_filename}': {e}")
+
+    if verbose:
+        print(aggregated.info())
+        aggregated.describe()
+
+    return aggregated
+
+
+def fuzzy_compare_legacy(df1=None,df2=None,
                     additional_vars_df1=None, additional_vars_df2=None,
                     endpoint_url=None,
                     query=None,
                     grouping_var=None, label_var=None, element_var=None, threshold=95, match_all=False, unique_rows=False, csv_filename="comparison.csv", verbose= True):
     """
+    !! Left here, as new function not tested much....
     Fuzzy string matching between two DataFrames (or SPARQL query results) based on a common element column.
 
     Supports optional grouping, label filtering, and aggregation of match statistics.
