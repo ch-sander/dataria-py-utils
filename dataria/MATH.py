@@ -257,9 +257,171 @@ def upset(
         
     return df_final
 
+def fuzzy_compare(df1, df2=None,
+                         match_by=None,
+                         grouping_var=None,
+                         treat_empty_as_match=False,
+                         match_all=True,
+                         unique_rows=False,
+                         additional_vars=None,
+                         csv_filename=None,
+                         verbose=True):
+    """
+    Perform a fast, memory-efficient fuzzy comparison between two DataFrames
+    with strict AND logic across multiple columns.
 
+    Each (column, threshold) pair in `match_by` must satisfy its threshold
+    for a group to be retained if `match_all=True`.
 
-def fuzzy_compare(df1=None, df2=None,
+    Parameters
+    ----------
+    df1 : pd.DataFrame
+        Primary DataFrame for comparison.
+    df2 : pd.DataFrame, optional
+        Secondary DataFrame to compare against. If None, `df1` is used (self-join).
+    match_by : list of (str, int)
+        List of tuples specifying columns to compare and their fuzzy thresholds
+        (0–100). Columns with threshold >=100 are treated as exact matches.
+    grouping_var : str, optional
+        Column name used to define group identities between df1 and df2.
+    treat_empty_as_match : bool, default=False
+        If True, empty strings ("") count as perfect matches (score = 100).
+    match_all : bool, default=True
+        If True, groups are retained only if *all* match_by conditions meet
+        their respective thresholds (strict AND logic). If False, any matching
+        condition is sufficient (OR logic).
+    unique_rows : bool, default=False
+        For self-joins, exclude symmetric duplicates.
+    additional_vars : list of str, optional
+        Additional columns to include in the aggregated output for context.
+    csv_filename : str, optional
+        Path to save the aggregated results as CSV. If None, results are not saved.
+    verbose : bool, default=True
+        If True, print progress and summary information.
+
+    Returns
+    -------
+    pd.DataFrame
+        Aggregated match statistics per (group1, group2) pair, including
+        per-column min/avg/max fuzzy scores and optional contextual fields.
+    """
+
+    if df2 is None:
+        df2 = df1
+    self_join = df1 is df2
+
+    if not match_by:
+        raise ValueError("Parameter 'match_by' must be specified (list of (column, threshold)).")
+
+    def normalize(s):
+        return s.fillna("").astype(str).str.strip().str.lower().to_numpy()
+
+    def uniq(vals):
+        return ", ".join(sorted({str(v) for v in vals if pd.notna(v)}))
+
+    df1 = df1.reset_index(drop=True).copy()
+    df2 = df2.reset_index(drop=True).copy()
+    df1["_i"] = np.arange(len(df1))
+    df2["_j"] = np.arange(len(df2))
+
+    exact_cols = [col for col, th in match_by if th >= 100]
+    fuzzy_cols = [(col, th) for col, th in match_by if th < 100]
+
+    if exact_cols:
+        if verbose:
+            print(f"Exact match on: {exact_cols}")
+        for col in exact_cols:
+            df1[f"__{col}"] = normalize(df1[col])
+            df2[f"__{col}"] = normalize(df2[col])
+        on_cols = [f"__{c}" for c in exact_cols]
+        merged = pd.merge(df1, df2, on=on_cols, suffixes=("_df1", "_df2"))
+    else:
+        merged = df1.assign(_key=1).merge(df2.assign(_key=1), on="_key", suffixes=("_df1", "_df2")).drop(columns="_key")
+
+    if merged.empty:
+        if verbose:
+            print("No candidate pairs after exact match filtering.")
+        return pd.DataFrame()
+
+    if verbose:
+        print(f"Candidate pairs after exact match filter: {len(merged)}")
+
+    keep_mask = np.ones(len(merged), dtype=bool)
+
+    for col, th in fuzzy_cols:
+        if f"{col}_df1" not in merged.columns or f"{col}_df2" not in merged.columns:
+            if verbose:
+                print(f"Column '{col}' missing in one dataframe — skipped.")
+            continue
+
+        s1 = normalize(merged[f"{col}_df1"])
+        s2 = normalize(merged[f"{col}_df2"])
+        sims = process.cpdist(s1, s2, scorer=fuzz.ratio, workers=-1)
+
+        if treat_empty_as_match:
+            empty_mask = (s1 == "") | (s2 == "")
+            sims[empty_mask] = 100.0
+
+        if match_all:
+            keep_mask &= sims >= th
+        else:
+            keep_mask |= sims >= th
+
+        merged[f"score_{col}"] = sims
+
+        if verbose:
+            n_ok = int((sims >= th).sum())
+            print(f"  '{col}' >= {th}: {n_ok}/{len(sims)}")
+
+    merged = merged[keep_mask]
+    if merged.empty:
+        if verbose:
+            print("No pairs left after fuzzy filtering.")
+        return pd.DataFrame()
+
+    if grouping_var and grouping_var in df1.columns and grouping_var in df2.columns:
+        merged["group1"] = merged[f"{grouping_var}_df1"]
+        merged["group2"] = merged[f"{grouping_var}_df2"]
+    else:
+        merged["group1"] = "all"
+        merged["group2"] = "all"
+
+    if self_join and unique_rows and grouping_var:
+        merged = merged[merged["group1"] < merged["group2"]]
+
+    if verbose:
+        print("Aggregating results...")
+
+    agg_dict = {"Num_Matches": ("_i", "count")}
+    for col, _ in fuzzy_cols:
+        agg_dict[f"Min_{col}"] = (f"score_{col}", "min")
+        agg_dict[f"Max_{col}"] = (f"score_{col}", "max")
+        agg_dict[f"Avg_{col}"] = (f"score_{col}", "mean")
+
+    for col in additional_vars or []:
+        if f"{col}_df1" in merged.columns and f"{col}_df2" in merged.columns:
+            agg_dict[f"df1_{col}"] = (f"{col}_df1", uniq)
+            agg_dict[f"df2_{col}"] = (f"{col}_df2", uniq)
+
+    agg = merged.groupby(["group1", "group2"]).agg(**agg_dict).reset_index()
+
+    if match_all and fuzzy_cols:
+        for col, th in fuzzy_cols:
+            agg = agg[agg[f"Min_{col}"] >= th]
+
+    if csv_filename:
+        try:
+            agg.to_csv(csv_filename, index=False)
+        except Exception as e:
+            print(f"Failed to save CSV file '{csv_filename}': {e}")
+
+    if verbose:
+        print(agg.info())
+        print(agg.describe())
+
+    return agg
+
+def fuzzy_compare_deprecated(df1=None, df2=None,
                   additional_vars_df1=None, additional_vars_df2=None,
                   endpoint_url=None, query=None,
                   grouping_var=None, label_var=None, element_var=None,
@@ -353,14 +515,17 @@ def fuzzy_compare(df1=None, df2=None,
     df1_plain = df1_plain.drop_duplicates(subset=[k for k in dedup_keys if k in df1_plain.columns])
     df2_plain = df2_plain.drop_duplicates(subset=[k for k in dedup_keys if k in df2_plain.columns])
 
+    # --- START MATCHING ---
+
     # --- IDENTICAL FILTER ---
     if identical_vars:
         merged = pd.merge(df1_plain, df2_plain,
                           on=identical_vars,
                           suffixes=("_df1", "_df2"))
-        merged = merged.groupby([f"{grouping_var}_df1", f"{grouping_var}_df2"]).filter(
-            lambda g: set(g[f"{element_var}_df1"]) == set(g[f"{element_var}_df2"])
-        )
+        # TODO needed?
+        # merged = merged.groupby([f"{grouping_var}_df1", f"{grouping_var}_df2"]).filter(
+        #     lambda g: set(g[f"{element_var}_df1"]) == set(g[f"{element_var}_df2"])
+        # )
 
         if not merged.empty:
             arr1 = normalize_series(merged[f"{element_var}_df1"])
@@ -368,16 +533,16 @@ def fuzzy_compare(df1=None, df2=None,
             idx_i = merged["_i"].to_numpy()
             idx_j = merged["_j"].to_numpy()
 
-            if threshold >= 100:
+            if threshold >= 100: # How this possible?
                 eq = (arr1 == arr2)
                 eq &= np.fromiter((_non_empty_pair(a, b) for a, b in zip(arr1, arr2)), bool, len(arr1))
-                if self_join: # TODO check!
+                if self_join:
                     eq &= (idx_i != idx_j)
                 for gi, gj in zip(idx_i[eq], idx_j[eq]):
                     if self_join and unique_rows and gj < gi:
                         continue
                     matches.append((gi, gj, 100))
-            else:
+            else:  # How this possible?
                 scores = process.cpdist(arr1, arr2,
                                         scorer=fuzz.ratio,
                                         score_cutoff=threshold,
@@ -408,10 +573,10 @@ def fuzzy_compare(df1=None, df2=None,
             gi_idx = idx1[hits["i_rel"].to_numpy()]
             gj_idx = idx2[hits["j_rel"].to_numpy()]
 
+            # TODO check: needed twice?
             if self_join:
                 mask = gi_idx != gj_idx
                 gi_idx, gj_idx = gi_idx[mask], gj_idx[mask]
-
             if self_join and unique_rows:
                 mask = gj_idx > gi_idx
                 gi_idx, gj_idx = gi_idx[mask], gj_idx[mask]
@@ -433,6 +598,7 @@ def fuzzy_compare(df1=None, df2=None,
                 gi_idx = sub_idx1[gi_rel]
                 gj_idx = idx2[gj_rel]
 
+                # TODO check: needed twice?
                 if self_join:
                     mask = gi_idx != gj_idx
                     gi_rel, gj_rel, gi_idx, gj_idx = gi_rel[mask], gj_rel[mask], gi_idx[mask], gj_idx[mask]
@@ -444,6 +610,7 @@ def fuzzy_compare(df1=None, df2=None,
                 sc = scores[gi_rel, gj_rel].astype(float)
                 matches.extend(zip(gi_idx, gj_idx, sc))
 
+    # --- END MATCHING ---
     if not matches:
         if verbose: print("No matches found (after self-join filtering and threshold).")
         return pd.DataFrame()
@@ -453,10 +620,10 @@ def fuzzy_compare(df1=None, df2=None,
     matches_df = matches_df.merge(df1_reset, left_on="i", right_on="_i_df1")
     matches_df = matches_df.merge(df2_reset, left_on="j", right_on="_j_df2")
 
-    if grouping_var and element_var in df1.columns and element_var in df2.columns:
-        matches_df = matches_df.groupby([f"{grouping_var}_df1", f"{grouping_var}_df2"]).filter(
-            lambda g: set(g[f"{element_var}_df1"]) == set(g[f"{element_var}_df2"])
-        )
+    # if grouping_var and element_var in df1.columns and element_var in df2.columns:
+    #     matches_df = matches_df.groupby([f"{grouping_var}_df1", f"{grouping_var}_df2"]).filter(
+    #         lambda g: set(g[f"{element_var}_df1"]) == set(g[f"{element_var}_df2"])
+    #     )
 
     if different_vars:
         ok_mask = np.ones(len(matches_df), dtype=bool)
@@ -521,7 +688,7 @@ def fuzzy_compare(df1=None, df2=None,
 
     aggregated = matches_df.groupby(['group1', 'group2']).agg(**agg_dict).reset_index()
 
-    if self_join and unique_rows and grouping_var:
+    if self_join and unique_rows and grouping_var: #needed again?
         aggregated = aggregated[aggregated['group1'].astype(str) < aggregated['group2'].astype(str)]
 
     if match_all:
